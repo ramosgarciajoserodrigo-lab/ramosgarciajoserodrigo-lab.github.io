@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en">
+<head><script>/* perf: cap JS animations at ~30 fps */(function(){var R=window.requestAnimationFrame,C=window.cancelAnimationFrame;if(!R||window.__fpsCap)return;window.__fpsCap=1;var Q={},n=0,last=0,on=false;function tick(t){on=false;if(t-last<31){on=true;R(tick);return;}last=t;var q=Q;Q={};for(var k in q)if(q.hasOwnProperty(k)){try{q[k](t);}catch(e){setTimeout(function(){throw e;});}}}window.requestAnimationFrame=function(cb){n++;Q[n]=cb;if(!on){on=true;R(tick);}return n;};window.cancelAnimationFrame=function(id){delete Q[id];};})();</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Predicting EAF Energy Use · José Rodrigo Ramos García</title>
+<meta name="description" content="Industry project with Ternium: statistics and a Random Forest model that predicts electric arc furnace energy per ton with ~1% error, with leakage control and scenario simulation.">
+<meta property="og:title" content="Predicting Electric Arc Furnace Energy Use">
+<meta property="og:description" content="Industrial & Systems Engineering project with Ternium · Tecnológico de Monterrey · 2026">
+<meta name="theme-color" content="#0a0806">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><script>(function(){var t=null;try{t=localStorage.getItem("theme")}catch(e){}if(t!=="light"&&t!=="dark")t="dark";document.documentElement.setAttribute("data-theme",t);})();</script>
+<style>
+/* Layout: inside a melt shop. Hero is the furnace with the electric arc; sections are steel-plate panels lit by molten orange (data that matters) and arc blue (the model). Single dark theme by design. */
+:root{
+  --ink:#0a0806; --ink-2:#120e0b; --plate:#17120f; --plate-2:#1f1914; --seam:#2e261f;
+  --fg:#f4ece2; --fg-2:#c4b7a8; --fg-3:#8c7e70;
+  --melt:#ff7a2f; --melt-hi:#ffb36b; --melt-bg:rgba(255,122,47,.1); --melt-line:rgba(255,122,47,.5);
+  --arc:#7fd3ff; --arc-bg:rgba(127,211,255,.08); --arc-line:rgba(127,211,255,.45);
+  --ok:#62d69a; --ok-bg:rgba(98,214,154,.1);
+  --bad:#ff6b5e;
+  --head:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;background:var(--ink)}
+body{margin:0;background:var(--ink);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.05;font-family:var(--head);font-weight:700;letter-spacing:.005em}
+p{margin:0}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+.lbl{font-family:var(--mono);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--melt)}
+.muted{color:var(--fg-2)}
+.small{font-size:15px}
+.note{font-family:var(--mono);font-size:13px;color:var(--fg-3);margin-top:10px}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;isolation:isolate;padding-block:110px 44px;min-height:580px;display:flex;align-items:flex-end}
+.hero .scene{position:absolute;inset:0;width:100%;height:100%;z-index:-2}
+.hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(10,8,6,.95) 0%,rgba(10,8,6,.75) 40%,rgba(10,8,6,0) 72%),linear-gradient(0deg,var(--ink) 0%,rgba(10,8,6,0) 30%)}
+.hero .wrap{width:100%}
+.hero h1{font-size:clamp(46px,7.6vw,92px);font-weight:800;text-transform:uppercase;line-height:.92;margin:16px 0 18px;max-width:13ch}
+.hero h1 em{font-style:normal;color:var(--melt);text-shadow:0 0 30px rgba(255,122,47,.5)}
+.hero .sub{font-size:clamp(17px,2vw,20px);color:var(--fg-2);max-width:54ch}
+.hero .meta{display:flex;flex-wrap:wrap;gap:6px 20px;font-family:var(--mono);font-size:13.5px;color:var(--fg-3);margin-top:18px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:40px}
+.kpis div{background:rgba(23,18,15,.75);backdrop-filter:blur(6px);border:1px solid var(--seam);border-radius:10px;padding:14px 16px}
+.kpis b{display:block;font-family:var(--head);font-size:clamp(30px,4vw,44px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.kpis span{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3)}
+.kpis .hot{border-color:var(--melt-line);background:rgba(255,122,47,.09)}
+.kpis .hot b{color:var(--melt);text-shadow:0 0 18px rgba(255,122,47,.45)}
+@media all{
+  .tip{animation:hot 2.4s ease-in-out infinite}
+  @keyframes hot{50%{opacity:.6}}
+  .arcflash{animation:aflash 2.3s steps(3,end) infinite}
+  @keyframes aflash{0%,100%{opacity:.08}30%{opacity:.22}45%{opacity:.04}70%{opacity:.16}}
+  .hero h1 .w{animation:slam .8s cubic-bezier(.2,.8,.2,1) both}
+  .hero h1 .w:nth-child(2){animation-delay:.12s}.hero h1 .w:nth-child(3){animation-delay:.24s}.hero h1 .w:nth-child(4){animation-delay:.36s}
+  @keyframes slam{from{transform:translateY(24px);opacity:.15;filter:blur(4px)}}
+  .rv{animation:reveal .7s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes reveal{from{transform:translateY(16px);opacity:.25}}
+  .rk.rv:nth-child(2){animation-delay:.08s}.rk.rv:nth-child(3){animation-delay:.16s}.rk.rv:nth-child(4){animation-delay:.24s}.rk.rv:nth-child(5){animation-delay:.32s}
+  .cmp.go .tr i{animation:grow 1.2s cubic-bezier(.2,.7,.2,1) both}
+  .cmp.go .row:nth-child(2) .tr i{animation-delay:.2s}.cmp.go .row:nth-child(3) .tr i{animation-delay:.4s}
+  @keyframes grow{from{transform:scaleX(0)}}
+  .ph .n{transition:color .4s}
+  .ph.rv .n{animation:stroke 1.4s ease-out both}
+  @keyframes stroke{0%{color:rgba(255,122,47,.6)}100%{color:transparent}}
+  .arcbolt{animation:flick 1.6s steps(2,end) infinite}
+  .arcbolt.b2{animation-duration:1.1s;animation-delay:-.4s}
+  .arcbolt.b3{animation-duration:1.9s;animation-delay:-.9s}
+  @keyframes flick{0%{opacity:1}20%{opacity:.35}35%{opacity:.9}60%{opacity:.5}80%{opacity:1}}
+  .bath{animation:breathe 4s ease-in-out infinite}
+  @keyframes breathe{50%{opacity:.82}}
+  .spark{animation:rise 2.6s linear infinite}
+  @keyframes rise{0%{transform:translate(0,0);opacity:0}10%{opacity:1}100%{transform:translate(var(--dx),-140px);opacity:0}}
+}
+
+/* HMI panel in hero */
+.hmi{position:relative;background:rgba(10,8,6,.6);border:1px solid rgba(127,211,255,.3);border-radius:12px;padding:12px 14px;font-family:var(--mono);font-size:12px;color:var(--fg-2);box-shadow:0 0 40px rgba(127,211,255,.06);min-width:0}
+.hmi-h{display:flex;justify-content:space-between;gap:8px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
+.hmi .live{color:var(--bad)}
+.hmi canvas{width:100%;height:auto;display:block}
+.hmi-f{display:flex;justify-content:space-between;margin-top:8px;font-size:13px}
+.hmi-f b{color:var(--fg);font-weight:600}
+.hmi-f .er b{color:var(--ok)}
+.hmi-k{display:flex;gap:14px;margin-top:6px;font-size:10.5px}
+.hmi-k i{display:inline-block;width:14px;height:2px;vertical-align:3px;margin-right:5px}
+.feed{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:22px;align-items:center;margin-bottom:16px;background:var(--plate);border:1px solid var(--seam);border-radius:12px;padding:20px 22px}
+.feed h3{font-size:22px;margin-bottom:6px}
+@media (max-width:760px){.feed{grid-template-columns:minmax(0,1fr)}}
+.hero h1 .w{display:inline-block}
+
+/* Heat cycle */
+.cycle{margin-top:18px;background:var(--plate);border:1px solid var(--seam);border-radius:12px;padding:20px 22px}
+.cyc-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.cyc-top h3{font-size:22px}
+.stages{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stg{border:1px solid var(--seam);border-radius:10px;padding:12px 14px;background:var(--plate-2);transition:all .35s;min-width:0}
+.stg .k{font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--fg-3)}
+.stg b{display:block;font-family:var(--head);font-size:21px;margin:2px 0 3px}
+.stg p{font-size:13.5px;color:var(--fg-3);line-height:1.4}
+.stg.on{border-color:var(--melt-line);background:var(--melt-bg);box-shadow:0 0 24px rgba(255,122,47,.15)}
+.stg.on .k{color:var(--melt)}
+.stg.on p{color:var(--fg-2)}
+.meter{margin-top:14px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;font-family:var(--mono);font-size:13px;color:var(--fg-3)}
+.meter .bar{height:10px;border-radius:5px;background:var(--plate-2);overflow:hidden}
+.meter .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--arc),var(--melt));border-radius:5px}
+.meter b{color:var(--fg);font-weight:600;min-width:9ch;text-align:right}
+
+/* Gauge */
+.gauge{display:grid;justify-items:center;margin:4px 0 10px}
+.gauge svg{width:min(260px,100%);height:auto}
+.gauge .needle{transition:transform 1.1s cubic-bezier(.3,1.4,.5,1);transform-origin:130px 130px}
+.gauge .gv{font-family:var(--head);font-size:30px;font-weight:800;fill:var(--fg)}
+.gauge .gl{font-family:var(--mono);font-size:10px;fill:var(--fg-3);letter-spacing:.08em}
+.gauge .g-tick line{stroke:var(--fg-3);stroke-width:1.5;opacity:.7}
+.gauge .g-nd{fill:var(--fg);filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.gauge .g-hub{fill:var(--fg)}.gauge .g-hub2{fill:var(--plate)}
+html[data-theme="light"] .gauge .g-track{stroke:#e4dacd}
+html[data-theme="light"] .gauge .g-s0{stop-color:#e4dacd}
+html[data-theme="light"] .gauge .g-nd{fill:#2a2019;filter:drop-shadow(0 2px 3px rgba(31,24,18,.25))}
+html[data-theme="light"] .gauge .g-hub{fill:#2a2019}
+html[data-theme="light"] .gauge .g-hub2{fill:#ffffff}
+
+/* Pipeline player */
+.pp{display:flex;gap:10px;align-items:center;margin:0 0 12px}
+.prog{height:3px;background:var(--plate-2);border-radius:2px;overflow:hidden;margin-top:10px;grid-column:1/-1}
+.prog i{display:block;height:100%;width:0;background:var(--arc)}
+.prog.run i{animation:pfill 2.6s linear}
+@keyframes pfill{to{width:100%}}
+
+/* Charts */
+.charts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:16px}
+.chart{background:var(--plate);border:1px solid var(--seam);border-radius:12px;padding:16px 18px;min-width:0}
+.chart h3{font-size:21px;margin-bottom:4px}
+.chart canvas{width:100%;height:auto;display:block;margin-top:8px}
+.spc{margin-top:18px}
+.spc-k{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:var(--mono);font-size:12.5px;color:var(--fg-3);margin-top:8px}
+.spc-k i{display:inline-block;width:14px;height:2px;vertical-align:3px;margin-right:6px}
+
+/* Nav */
+.back-home{position:fixed;z-index:60;top:calc(14px + env(safe-area-inset-top,0px));left:calc(14px + env(safe-area-inset-left,0px));display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(10,8,6,.82);backdrop-filter:blur(8px);border:1px solid #ff7a2f;color:#ff7a2f;font-family:var(--mono);font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 6px 24px rgba(0,0,0,.45);transition:transform .2s,background .2s}
+.back-home:hover,.back-home:focus-visible{transform:translateX(-3px);background:#ff7a2f;color:#140c04;outline:none}
+@media (min-width:761px){.nav .wrap{padding-left:max(18px,calc(150px - (100vw - 1100px) / 2))}}
+
+
+.nav{position:sticky;top:0;z-index:20;background:rgba(10,8,6,.9);backdrop-filter:blur(10px);border-block:1px solid var(--seam)}
+.nav .wrap{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-block:9px}
+.nav .wrap::-webkit-scrollbar{display:none}
+.nav a{flex:none;font-family:var(--mono);font-size:13.5px;color:var(--fg-2);text-decoration:none;padding:5px 10px;border-radius:6px}
+.nav a:hover,.nav a:focus-visible{background:var(--melt-bg);color:var(--melt);outline:none}
+
+/* Sections */
+main section{padding-block:72px;border-bottom:1px solid var(--seam);scroll-margin-top:50px}
+main section:last-child{border-bottom:none}
+.sh{display:grid;gap:12px;margin-bottom:30px}
+.sh h2{font-size:clamp(34px,4.6vw,52px);text-transform:uppercase}
+.sh p{color:var(--fg-2);max-width:66ch;font-size:18px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.panel{background:var(--plate);border:1px solid var(--seam);border-radius:12px;padding:20px 22px;min-width:0}
+.panel h3{font-size:22px;margin-bottom:10px}
+.panel ul{margin:0;padding-left:18px;color:var(--fg-2)}
+.panel li{margin:5px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:13.5px;padding:4px 10px;border-radius:6px;background:var(--plate-2);color:var(--fg-2);border:1px solid var(--seam)}
+.quote{font-family:var(--head);font-size:clamp(26px,3.2vw,36px);line-height:1.15;font-weight:600;max-width:30ch;margin:4px 0 30px}
+.quote b{color:var(--melt);font-weight:700}
+
+/* Phases */
+.phases{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--seam);border-radius:12px;overflow:hidden}
+.ph{background:var(--plate);padding:22px;border-right:1px solid var(--seam);min-width:0;position:relative}
+.ph:last-child{border-right:none}
+.ph .n{font-family:var(--head);font-size:64px;font-weight:800;line-height:.8;color:transparent;-webkit-text-stroke:1.5px var(--melt);opacity:.8}
+.ph h3{font-size:24px;margin:12px 0 8px}
+.ph p{font-size:15px;color:var(--fg-2);margin-bottom:14px}
+.ph.mid{background:linear-gradient(180deg,rgba(127,211,255,.08),var(--plate) 60%)}
+.ph.mid .n{-webkit-text-stroke-color:var(--arc)}
+
+/* Ranking */
+.rank{display:grid;gap:10px}
+.rk{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--plate);border:1px solid var(--seam);border-radius:10px;padding:12px 16px}
+.rk .i{font-family:var(--head);font-size:26px;font-weight:800;color:var(--melt)}
+.rk b{font-weight:600}
+.rk small{display:block;color:var(--fg-3);font-size:14px}
+.rk .t{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.t.c{background:var(--ok-bg);color:var(--ok)}
+.t.n{background:var(--plate-2);color:var(--fg-3);border:1px solid var(--seam)}
+.t.e{background:var(--arc-bg);color:var(--arc)}
+
+/* Leakage */
+.leak{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:stretch}
+.formula{background:var(--plate);border:1px solid var(--seam);border-radius:12px;padding:22px;display:grid;gap:14px;align-content:start}
+.formula .eq{font-family:var(--mono);font-size:clamp(15px,1.9vw,19px);line-height:1.5;background:var(--ink-2);border:1px solid var(--seam);border-radius:10px;padding:16px;overflow-x:auto}
+.formula .eq span{color:var(--melt)}
+.toggle{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--seam);border-radius:10px;background:var(--plate);flex-wrap:wrap}
+.toggle button{font:inherit;font-family:var(--mono);font-size:13.5px;color:var(--fg-2);background:none;border:0;border-radius:7px;padding:7px 12px;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--melt);color:#1b0c02}
+.toggle button:focus-visible{outline:2px solid var(--melt);outline-offset:2px}
+.vars{display:flex;flex-wrap:wrap;gap:7px}
+.var{font-family:var(--mono);font-size:13.5px;padding:5px 10px;border-radius:6px;border:1px solid var(--seam);background:var(--plate-2);color:var(--fg-2);transition:all .25s}
+.var.lk{border-color:rgba(255,107,94,.55);color:var(--bad);background:rgba(255,107,94,.08)}
+.leak[data-mode="honest"] .var.lk{opacity:.35;text-decoration:line-through}
+.verdict{border-radius:12px;padding:18px 20px;border:1px solid;transition:all .3s}
+.verdict h3{font-size:22px;margin-bottom:6px}
+.verdict p{font-size:15px;color:var(--fg-2)}
+.leak[data-mode="leak"] .verdict{border-color:rgba(255,107,94,.5);background:rgba(255,107,94,.08)}
+.leak[data-mode="leak"] .verdict h3{color:var(--bad)}
+.leak[data-mode="honest"] .verdict{border-color:rgba(98,214,154,.5);background:var(--ok-bg)}
+.leak[data-mode="honest"] .verdict h3{color:var(--ok)}
+
+/* Pipeline */
+.pipe{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.st{all:unset;box-sizing:border-box;cursor:pointer;display:block;background:var(--plate);border:1px solid var(--seam);border-radius:10px;padding:14px 16px;min-width:0;transition:border-color .2s,background .2s}
+.st:focus-visible{outline:2px solid var(--arc);outline-offset:3px}
+.st[aria-pressed="true"]{border-color:var(--arc-line);background:var(--arc-bg)}
+.st .k{font-family:var(--mono);font-size:13px;color:var(--arc)}
+.st .t{display:block;font-family:var(--head);font-size:21px;font-weight:700;margin-top:4px;line-height:1.1}
+.detail{margin-top:12px;background:var(--plate);border:1px solid var(--seam);border-left:3px solid var(--arc);border-radius:10px;padding:18px 22px;min-height:110px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start}
+.detail h3{font-size:24px;margin-bottom:6px}
+.detail p{color:var(--fg-2);max-width:70ch}
+.detail .fig{font-family:var(--mono);text-align:right}
+.detail .fig b{display:block;font-family:var(--head);font-size:38px;font-weight:800;color:var(--arc);line-height:1}
+.detail .fig span{font-size:12px;color:var(--fg-3);text-transform:uppercase;letter-spacing:.08em}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.mt{background:var(--plate);border:1px solid var(--seam);border-radius:12px;padding:18px 20px}
+.mt b{display:block;font-family:var(--head);font-size:44px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.mt .nm{font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3);margin:6px 0 8px}
+.mt p{font-size:14.5px;color:var(--fg-2)}
+.mt.key{border-color:var(--arc-line);background:linear-gradient(180deg,rgba(127,211,255,.1),var(--plate) 70%)}
+.mt.key b{color:var(--arc)}
+.honest{margin-top:16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:18px;align-items:center}
+.cmp{display:grid;gap:10px}
+.cmp .row{display:grid;grid-template-columns:130px minmax(0,1fr) 54px;gap:12px;align-items:center;font-size:14.5px}
+.cmp .row span:first-child{font-family:var(--mono);font-size:13.5px;color:var(--fg-2)}
+.cmp .tr{height:14px;border-radius:7px;background:var(--plate-2);overflow:hidden}
+.cmp .tr i{display:block;height:100%;border-radius:7px;transform-origin:left center}
+.cmp .v{font-family:var(--mono);text-align:right}
+
+/* Simulation */
+.sim{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+.sim canvas{width:100%;height:auto;display:block;background:var(--ink-2);border:1px solid var(--seam);border-radius:12px}
+.ctrl{display:grid;gap:16px}
+.ctrl label{display:grid;gap:6px;font-size:15px;color:var(--fg-2)}
+.ctrl input[type=range]{width:100%;accent-color:var(--melt)}
+.ctrl .row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:13.5px;color:var(--fg)}
+.out{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.out div{background:var(--plate);border:1px solid var(--seam);border-radius:10px;padding:12px 14px}
+.out b{display:block;font-family:var(--head);font-size:30px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+.out span{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3)}
+.out .best b{color:var(--melt)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13.5px;color:var(--fg-2);margin-top:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+.btn{font:inherit;font-family:var(--mono);font-size:13.5px;padding:8px 13px;border-radius:8px;border:1px solid var(--seam);background:var(--plate);color:var(--fg);cursor:pointer;justify-self:start}
+.btn:hover{border-color:var(--melt-line);color:var(--melt)}
+.btn:focus-visible{outline:2px solid var(--melt);outline-offset:2px}
+
+/* Improvements */
+.imp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.imp .panel h3{display:flex;align-items:center;gap:8px;font-size:21px}
+.imp .panel h3 i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.imp ul{font-size:15px}
+.ctl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:18px;border:1px solid var(--seam);border-radius:12px;overflow:hidden;background:var(--plate)}
+.ctl div{padding:18px 20px;border-right:1px solid var(--seam)}
+.ctl div:last-child{border-right:none}
+.ctl .f{font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--melt)}
+.ctl b{display:block;font-family:var(--head);font-size:21px;margin:4px 0 6px}
+.ctl p{font-size:14.5px;color:var(--fg-2)}
+
+/* Closing */
+.closing{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.fb{border:1px solid var(--arc-line);border-radius:12px;padding:24px;background:radial-gradient(120% 120% at 100% 0%,rgba(127,211,255,.12),var(--plate) 60%)}
+.fb p{font-family:var(--head);font-size:clamp(22px,2.6vw,27px);font-weight:600;line-height:1.25;margin-top:10px}
+.fb .lbl{color:var(--arc)}
+footer{border-top:1px solid var(--seam);font-family:var(--mono);font-size:13px;color:var(--fg-3)}
+footer .wrap{padding-block:26px calc(28px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between}
+footer a{color:var(--fg-2)}
+
+@media (max-width:900px){
+  .imp{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pipe{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .stages{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .charts{grid-template-columns:minmax(0,1fr)}
+  .hero{min-height:0;padding-top:300px}
+  .hero .scene{height:360px;bottom:auto}
+  .hero:after{background:linear-gradient(180deg,rgba(10,8,6,0) 0,rgba(10,8,6,.1) 180px,var(--ink) 350px)}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2,.grid3,.leak,.metrics,.honest,.sim,.closing,.imp{grid-template-columns:minmax(0,1fr)}
+  .phases,.ctl{grid-template-columns:minmax(0,1fr)}
+  .ph,.ctl div{border-right:none;border-bottom:1px solid var(--seam)}
+  .ph:last-child,.ctl div:last-child{border-bottom:none}
+  .detail{grid-template-columns:minmax(0,1fr)}
+  .detail .fig{text-align:left}
+  .cmp .row{grid-template-columns:100px minmax(0,1fr) 48px}
+}
+@media (prefers-reduced-motion:reduce) and (max-width:1px){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+.tr{position:fixed;z-index:60;top:calc(14px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));display:flex;align-items:center;gap:10px}
+.lng{position:relative;display:inline-flex;padding:3px;border-radius:999px;background:rgba(10,8,6,.82);backdrop-filter:blur(8px);border:1px solid #ff7a2f;cursor:pointer;font-family:var(--mono);font-size:12.5px;font-weight:600}
+.lng span{padding:5px 10px;border-radius:999px;color:var(--fg-2);transition:background .2s,color .2s}
+html[lang="en"] .lng span[data-l="en"],html[lang="es"] .lng span[data-l="es"]{background:#ff7a2f;color:#140c04}
+.lng:focus-visible{outline:2px solid #ff7a2f;outline-offset:2px}
+@media (min-width:761px){.nav .wrap{padding-right:max(18px,calc(250px - (100vw - 1100px) / 2))}}
+.idx{position:relative;flex:none}
+.idx-b{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12.5px;font-weight:600;color:#140c04;background:#ffb547;border:0;border-radius:8px;padding:7px 11px;cursor:pointer;transition:filter .2s;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+.idx-b:hover{filter:brightness(1.08)}
+.idx-b:focus-visible{outline:2px solid #f3efe6;outline-offset:2px}
+.idx-b svg{width:15px;height:15px}
+.idx-b .chev{width:12px;height:12px;transition:transform .2s}
+.idx.open .idx-b .chev{transform:rotate(180deg)}
+.idx-p{display:none;position:absolute;right:0;top:calc(100% + 10px);min-width:230px;max-height:calc(100vh - 90px);overflow:auto;background:#11131b;border:1px solid #2a2f3d;border-radius:14px;padding:8px;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.idx.open .idx-p{display:block;animation:idxin .18s ease-out}
+@keyframes idxin{from{opacity:0;transform:translateY(-6px)}}
+.idx-p .il{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:#7d8597;padding:6px 10px 8px}
+.idx-p a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:#aab1c0;text-decoration:none;font-size:15px;font-family:inherit}
+.idx-p a:before{content:"";width:6px;height:6px;border-radius:50%;background:#2a2f3d;flex:none;transition:background .2s}
+.idx-p a:hover,.idx-p a:focus-visible{background:#1a1e29;color:#f3efe6;outline:none}
+.idx-p a.cur{color:#f3efe6}
+.idx-p a.cur:before{background:#ffb547;box-shadow:0 0 8px #ffb547}
+@media (max-width:640px){.idx-b{padding:7px 9px}.idx-b .chev{display:none}.tr{gap:8px}}
+
+:root{--mono:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif}
+.lbl,.note,.nav a,.chip,.btn,.toggle button,.kpis span,.when,.k,.badge,.meta span,.stk,.st .k,.mt .nm,.spc-k,.hmi-k,.hmi-f,.out span,.ctl .f,.crow .f,.total span,.core small,.ctx span,.gr .nm span,td.stat,.lv .act,.alt .k,.step .k,.stg .k,.rk .t,.var,footer{letter-spacing:.03em!important}
+.lbl,.kpis span,.alt .k,.step .k,.stg .k,.st .k{font-weight:600}
+.kpis b,.cell,#mx,.gt i,.out b,.mt b{font-variant-numeric:tabular-nums}
+
+section{padding-block:56px}
+.note{color:var(--fg-2)}
+html[data-theme="light"]{--fg-2:#4a3e33;--fg-3:#64564a;--melt:#b8460f;--melt-hi:#963708;--arc:#126e8a}
+.thm{flex:none;display:inline-grid;place-items:center;width:36px;height:36px;border-radius:999px;cursor:pointer;padding:0;color:#ff7a2f;background:rgba(10,8,6,.82);border:1px solid #ff7a2f;backdrop-filter:blur(8px);transition:transform .2s}
+.thm:hover{transform:rotate(-12deg)}
+.thm:focus-visible{outline:2px solid #ff7a2f;outline-offset:2px}
+.thm svg{width:17px;height:17px;grid-area:1/1}
+html[data-theme="dark"] .thm .i-moon,html[data-theme="light"] .thm .i-sun{display:none}
+
+html[data-theme="light"]{--ink:#f7f3ee;--ink-2:#eee7df;--plate:#ffffff;--plate-2:#f4eee7;--seam:#e0d6ca;--fg:#1f1812;--fg-2:#54473a;--fg-3:#7a6a5a;
+ --melt:#cf5216;--melt-hi:#ad410c;--melt-bg:rgba(207,82,22,.09);--melt-line:rgba(207,82,22,.42);--arc:#17809f;--arc-bg:rgba(23,128,159,.08);--arc-line:rgba(23,128,159,.42);
+ --ok:#1b8f5a;--ok-bg:rgba(27,143,90,.1);--bad:#cf3a2d;color-scheme:light}
+html[data-theme="light"] .hmi{background:#ffffff;border-color:var(--arc-line);box-shadow:0 10px 30px -16px rgba(31,24,18,.25)}
+html[data-theme="light"] .nav{background:rgba(247,243,238,.92)}
+html[data-theme="light"] .panel,html[data-theme="light"] .mt,html[data-theme="light"] .stg,html[data-theme="light"] .ph{box-shadow:0 1px 2px rgba(31,24,18,.05),0 6px 18px rgba(31,24,18,.05)}
+html[data-theme="light"] .toggle button[aria-pressed="true"]{background:#ff7a2f;color:#1b0c02}
+html[data-theme="light"] .stg.on{box-shadow:0 0 0 1px var(--melt-line)}
+
+.scene *{transition:fill .9s ease,stroke .9s ease,opacity .9s ease,stop-color .9s ease,transform 1.2s cubic-bezier(.3,.7,.2,1)}
+.scene .d-only{opacity:0}
+html[data-theme="light"] .scene .d-only{opacity:1}
+.scene .d-sun{transform:translateY(120px)}
+html[data-theme="light"] .scene .d-sun{transform:none}
+.scene .d-cloud{transform:translateX(-80px)}
+html[data-theme="light"] .scene .d-cloud{transform:none}
+.d-beam{animation:beam 6s ease-in-out infinite}
+@keyframes beam{50%{opacity:.6}}
+
+html[data-theme="light"] .hero:after{background:linear-gradient(90deg,rgba(247,243,238,.95) 0%,rgba(247,243,238,.74) 40%,rgba(247,243,238,0) 72%),linear-gradient(0deg,var(--ink) 0%,rgba(247,243,238,0) 30%)}
+@media (max-width:760px){html[data-theme="light"] .hero:after{background:linear-gradient(180deg,rgba(247,243,238,0) 0,rgba(247,243,238,.1) 180px,var(--ink) 350px)}}
+html[data-theme="light"] .kpis div{background:rgba(255,255,255,.88)}
+html[data-theme="light"] .kpis .hot{background:rgba(255,228,210,.9)}
+html[data-theme="light"] .hero h1 em{text-shadow:none}
+html[data-theme="light"] .scene stop[stop-color="#070504"]{stop-color:#eee5d8}
+html[data-theme="light"] .scene stop[stop-color="#120c08"]{stop-color:#ddd0bf}
+html[data-theme="light"] .scene rect[fill="#1a130e"]{fill:#b3a38f}
+html[data-theme="light"] .scene rect[fill="#1d1510"]{fill:#9c8c79}
+html[data-theme="light"] .scene rect[fill="#231a13"]{fill:#8b7b69}
+html[data-theme="light"] .scene [stroke="#2a1f17"]{stroke:#8a7a68}
+html[data-theme="light"] .scene stop[stop-color="#2a2724"]{stop-color:#6b645d}
+html[data-theme="light"] .scene stop[stop-color="#5a544e"]{stop-color:#a8a097}
+html[data-theme="light"] .scene stop[stop-color="#211e1b"]{stop-color:#5a534d}
+html[data-theme="light"] .scene rect[fill="#3a2e24"]{fill:#6d5a48}
+html[data-theme="light"] .scene path[fill="#2a2018"]{fill:#5b4a3c}
+html[data-theme="light"] .scene stop[stop-color="#1c1612"]{stop-color:#4f4136}
+html[data-theme="light"] .scene stop[stop-color="#2b221b"]{stop-color:#6b5949}
+html[data-theme="light"] .scene stop[stop-color="#16110d"]{stop-color:#44372d}
+html[data-theme="light"] .scene rect[fill="#0d0907"]{fill:#c4b6a4}
+html[data-theme="light"] .scene #glow stop:first-child{stop-opacity:.3}
+.nav{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(10,8,6,.97)!important}
+html[data-theme="light"] .nav{background:rgba(247,243,238,.97)!important}
+.back-home,.lng,.thm,.kpis div{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.back-home,.lng,.thm{background:rgba(10,8,6,.94)}
+.off,.off *{animation-play-state:paused!important}
+.back-home{font-weight:700}
+html[data-theme="dark"] .lng span{color:#ece6dc}
+html[data-theme="dark"] .back-home{color:#ff7a2f;border-width:1.5px}
+html[data-theme="light"] .back-home,html[data-theme="light"] .lng,html[data-theme="light"] .thm{background:rgba(255,255,255,.94);border-color:#cf5216;box-shadow:0 6px 18px rgba(20,20,30,.12)}
+html[data-theme="light"] .back-home,html[data-theme="light"] .thm{color:#cf5216}
+html[data-theme="light"] .back-home:hover,html[data-theme="light"] .back-home:focus-visible{background:#ff7a2f;color:#140c04}
+html[data-theme="light"] .lng span{color:#5b6070}
+html[data-theme="light"] .idx-b{box-shadow:0 6px 18px rgba(20,20,30,.15)}
+html[data-theme="light"] .idx-p{background:#ffffff;border-color:#ddd7cc;box-shadow:0 18px 40px -12px rgba(21,23,30,.25)}
+html[data-theme="light"] .idx-p .il{color:#6f7483}
+html[data-theme="light"] .idx-p a{color:#474c5b}
+html[data-theme="light"] .idx-p a:before{background:#d1ccc1}
+html[data-theme="light"] .idx-p a:hover,html[data-theme="light"] .idx-p a:focus-visible{background:#f3f1ec;color:#15171e}
+html[data-theme="light"] .idx-p a.cur{color:#15171e;background:#f3f1ec}
+.idx-p a.cur{background:#1a1e29}
+</style>
+</head>
+<body>
+
+<a class="back-home" href="../" aria-label="Back to portfolio home"><span aria-hidden="true">←</span> Portfolio</a>
+<div class="tr"><div class="idx" id="idx"><button class="idx-b" id="idx-b" type="button" aria-expanded="false" aria-controls="idx-p"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg><span>Index</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><nav class="idx-p" id="idx-p" aria-label="Index"><div class="il">Index</div></nav></div><button class="thm" id="thm" type="button" aria-label="Switch to light mode"><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg></button><button class="lng" id="lng" type="button" aria-label="Cambiar a español"><span data-l="en">EN</span><span data-l="es">ES</span></button></div>
+<header class="hero">
+  <svg class="scene" viewBox="0 0 1200 580" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
+<defs>
+<radialGradient id="glow" cx="900" cy="430" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff7a2f" stop-opacity=".45"/><stop offset=".4" stop-color="#ff7a2f" stop-opacity=".12"/><stop offset="1" stop-color="#ff7a2f" stop-opacity="0"/></radialGradient>
+<radialGradient id="arcg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff"/><stop offset=".2" stop-color="#cfeeff" stop-opacity=".9"/><stop offset="1" stop-color="#7fd3ff" stop-opacity="0"/></radialGradient>
+<linearGradient id="bathg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe2a8"/><stop offset=".35" stop-color="#ff9a3c"/><stop offset="1" stop-color="#b8370e"/></linearGradient>
+<linearGradient id="shell" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1c1612"/><stop offset=".5" stop-color="#2b221b"/><stop offset="1" stop-color="#16110d"/></linearGradient>
+<linearGradient id="elec" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2a2724"/><stop offset=".45" stop-color="#5a544e"/><stop offset="1" stop-color="#211e1b"/></linearGradient>
+<linearGradient id="tipg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4a1c" stop-opacity="0"/><stop offset=".6" stop-color="#ff6a2b" stop-opacity=".7"/><stop offset="1" stop-color="#ffd27a"/></linearGradient>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070504"/><stop offset="1" stop-color="#120c08"/></linearGradient>
+</defs>
+<rect width="1200" height="580" fill="url(#bg)"/>
+<rect x="560" y="40" width="14" height="580" fill="#1a130e" opacity=".7"/>
+<rect x="710" y="40" width="14" height="580" fill="#1a130e" opacity=".7"/>
+<rect x="860" y="40" width="14" height="580" fill="#1a130e" opacity=".7"/>
+<rect x="1010" y="40" width="14" height="580" fill="#1a130e" opacity=".7"/>
+<rect x="1160" y="40" width="14" height="580" fill="#1a130e" opacity=".7"/>
+<rect x="520" y="60" width="700" height="18" fill="#1d1510"/><rect x="760" y="78" width="120" height="26" fill="#231a13"/>
+<line x1="530" y1="60" x2="543" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="557" y1="60" x2="570" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="584" y1="60" x2="597" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="611" y1="60" x2="624" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="638" y1="60" x2="651" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="665" y1="60" x2="678" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="692" y1="60" x2="705" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="719" y1="60" x2="732" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="746" y1="60" x2="759" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="773" y1="60" x2="786" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="800" y1="60" x2="813" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="827" y1="60" x2="840" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="854" y1="60" x2="867" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="881" y1="60" x2="894" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="908" y1="60" x2="921" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="935" y1="60" x2="948" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="962" y1="60" x2="975" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="989" y1="60" x2="1002" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1016" y1="60" x2="1029" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1043" y1="60" x2="1056" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1070" y1="60" x2="1083" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1097" y1="60" x2="1110" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1124" y1="60" x2="1137" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1151" y1="60" x2="1164" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1178" y1="60" x2="1191" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<line x1="1205" y1="60" x2="1218" y2="78" stroke="#2a1f17" stroke-width="2"/>
+<g class="d-only"><g fill="#fff8e6"><rect x="600" y="0" width="110" height="40"/><rect x="760" y="0" width="110" height="40"/><rect x="920" y="0" width="110" height="40"/><rect x="1080" y="0" width="110" height="40"/></g><g fill="#fff3d0" class="d-beam"><polygon points="600,40 710,40 640,500 470,500" opacity=".35"/><polygon points="920,40 1030,40 1000,500 840,500" opacity=".28"/><polygon points="1080,40 1190,40 1200,300 1200,500 1040,500" opacity=".3"/></g></g>
+<rect width="1200" height="580" fill="url(#glow)"/>
+<rect x="813" y="104" width="34" height="232" fill="url(#elec)"/>
+<rect x="806" y="150" width="48" height="16" rx="3" fill="#3a2e24"/>
+<rect class="tip" x="813" y="300" width="34" height="36" fill="url(#tipg)"/>
+<rect x="883" y="104" width="34" height="232" fill="url(#elec)"/>
+<rect x="876" y="150" width="48" height="16" rx="3" fill="#3a2e24"/>
+<rect class="tip" x="883" y="300" width="34" height="36" fill="url(#tipg)"/>
+<rect x="953" y="104" width="34" height="232" fill="url(#elec)"/>
+<rect x="946" y="150" width="48" height="16" rx="3" fill="#3a2e24"/>
+<rect class="tip" x="953" y="300" width="34" height="36" fill="url(#tipg)"/>
+<path d="M710 345 Q 900 300 1090 345 L 1100 362 L 700 362 Z" fill="#2a2018" stroke="#3b2d21"/>
+<path d="M685 362 L 1115 362 L 1090 470 Q 900 520 710 470 Z" fill="url(#shell)" stroke="#3b2d21" stroke-width="2"/>
+<ellipse class="bath" cx="900" cy="368" rx="170" ry="16" fill="url(#bathg)"/>
+<ellipse cx="900" cy="366" rx="210" ry="60" fill="url(#glow)" opacity=".8"/>
+<circle class="arcflash" cx="900" cy="350" r="420" fill="url(#arcg)" opacity=".1"/>
+<circle class="arcbolt b1" cx="830" cy="350" r="46" fill="url(#arcg)"/>
+<path class="arcbolt b1" d="M830.0 336.0 L826.8 341.0 L825.2 346.0 L828.8 351.0 L825.9 356.0 L824.8 361.0 L828.8 366.0" stroke="#eaf8ff" stroke-width="2" fill="none"/>
+<circle class="arcbolt b2" cx="900" cy="350" r="46" fill="url(#arcg)"/>
+<path class="arcbolt b2" d="M900.0 336.0 L905.0 341.0 L903.6 346.0 L903.2 351.0 L896.7 356.0 L900.4 361.0 L897.3 366.0" stroke="#eaf8ff" stroke-width="2" fill="none"/>
+<circle class="arcbolt b3" cx="970" cy="350" r="46" fill="url(#arcg)"/>
+<path class="arcbolt b3" d="M970.0 336.0 L966.1 341.0 L965.3 346.0 L966.6 351.0 L975.1 356.0 L973.9 361.0 L973.7 366.0" stroke="#eaf8ff" stroke-width="2" fill="none"/>
+<circle class="spark" style="--dx:-42px;animation-delay:-1.63s;animation-duration:2.97s" cx="1002" cy="337" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:38px;animation-delay:-1.32s;animation-duration:2.08s" cx="759" cy="351" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:70px;animation-delay:-2.45s;animation-duration:3.14s" cx="825" cy="363" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:84px;animation-delay:-2.20s;animation-duration:2.61s" cx="1039" cy="350" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-11px;animation-delay:-0.61s;animation-duration:2.22s" cx="874" cy="340" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:109px;animation-delay:-1.35s;animation-duration:2.84s" cx="758" cy="346" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-67px;animation-delay:-1.07s;animation-duration:2.12s" cx="847" cy="365" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-14px;animation-delay:-1.53s;animation-duration:2.82s" cx="880" cy="336" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-96px;animation-delay:-0.60s;animation-duration:3.02s" cx="1037" cy="334" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:96px;animation-delay:-0.76s;animation-duration:1.84s" cx="1023" cy="334" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:100px;animation-delay:-1.91s;animation-duration:3.34s" cx="967" cy="361" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-76px;animation-delay:-1.69s;animation-duration:3.18s" cx="840" cy="341" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:26px;animation-delay:-2.32s;animation-duration:2.27s" cx="961" cy="333" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-37px;animation-delay:-0.02s;animation-duration:1.87s" cx="860" cy="364" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:109px;animation-delay:-1.49s;animation-duration:2.50s" cx="854" cy="358" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-97px;animation-delay:-0.14s;animation-duration:2.07s" cx="874" cy="337" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:10px;animation-delay:-1.51s;animation-duration:2.31s" cx="1060" cy="351" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:60px;animation-delay:-1.06s;animation-duration:3.38s" cx="772" cy="349" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-2px;animation-delay:-0.57s;animation-duration:2.51s" cx="799" cy="345" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-0px;animation-delay:-0.08s;animation-duration:2.21s" cx="1032" cy="359" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-18px;animation-delay:-0.68s;animation-duration:2.32s" cx="909" cy="357" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-21px;animation-delay:-2.34s;animation-duration:2.85s" cx="922" cy="365" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-90px;animation-delay:-0.55s;animation-duration:3.20s" cx="983" cy="347" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:66px;animation-delay:-1.67s;animation-duration:3.10s" cx="844" cy="353" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:66px;animation-delay:-0.88s;animation-duration:2.43s" cx="803" cy="358" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:102px;animation-delay:-1.74s;animation-duration:1.87s" cx="755" cy="364" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:37px;animation-delay:-0.16s;animation-duration:2.07s" cx="773" cy="364" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-21px;animation-delay:-1.02s;animation-duration:3.08s" cx="888" cy="347" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:83px;animation-delay:-0.30s;animation-duration:3.10s" cx="1044" cy="330" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:83px;animation-delay:-0.52s;animation-duration:2.87s" cx="1028" cy="349" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:63px;animation-delay:-2.38s;animation-duration:2.50s" cx="1008" cy="350" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-2px;animation-delay:-2.25s;animation-duration:2.77s" cx="742" cy="351" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:83px;animation-delay:-2.35s;animation-duration:2.28s" cx="744" cy="333" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:10px;animation-delay:-0.99s;animation-duration:3.06s" cx="1011" cy="333" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:78px;animation-delay:-1.04s;animation-duration:1.92s" cx="862" cy="357" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:110px;animation-delay:-1.08s;animation-duration:2.94s" cx="1001" cy="343" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-67px;animation-delay:-0.79s;animation-duration:3.14s" cx="753" cy="361" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-28px;animation-delay:-0.42s;animation-duration:2.93s" cx="770" cy="350" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:9px;animation-delay:-2.35s;animation-duration:2.94s" cx="898" cy="342" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-86px;animation-delay:-2.04s;animation-duration:2.76s" cx="950" cy="334" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:76px;animation-delay:-0.93s;animation-duration:3.03s" cx="756" cy="339" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:90px;animation-delay:-1.41s;animation-duration:3.25s" cx="731" cy="332" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:63px;animation-delay:-1.59s;animation-duration:2.51s" cx="834" cy="360" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:107px;animation-delay:-0.88s;animation-duration:2.49s" cx="816" cy="351" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-71px;animation-delay:-2.34s;animation-duration:2.40s" cx="779" cy="358" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:84px;animation-delay:-0.20s;animation-duration:2.83s" cx="1000" cy="354" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-72px;animation-delay:-2.30s;animation-duration:2.77s" cx="842" cy="343" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:66px;animation-delay:-2.10s;animation-duration:3.33s" cx="1053" cy="359" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:35px;animation-delay:-2.58s;animation-duration:1.92s" cx="792" cy="365" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:85px;animation-delay:-0.58s;animation-duration:3.06s" cx="788" cy="347" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-21px;animation-delay:-1.56s;animation-duration:3.23s" cx="833" cy="362" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:54px;animation-delay:-1.40s;animation-duration:2.65s" cx="805" cy="343" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-22px;animation-delay:-2.13s;animation-duration:2.25s" cx="1036" cy="344" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:87px;animation-delay:-1.19s;animation-duration:2.70s" cx="930" cy="339" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-104px;animation-delay:-1.33s;animation-duration:2.53s" cx="867" cy="344" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-41px;animation-delay:-0.24s;animation-duration:2.21s" cx="1043" cy="351" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:23px;animation-delay:-0.17s;animation-duration:3.28s" cx="948" cy="347" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-74px;animation-delay:-2.06s;animation-duration:2.89s" cx="832" cy="363" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-106px;animation-delay:-0.64s;animation-duration:3.00s" cx="972" cy="349" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-83px;animation-delay:-0.16s;animation-duration:3.39s" cx="741" cy="341" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-72px;animation-delay:-0.39s;animation-duration:2.46s" cx="937" cy="352" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:13px;animation-delay:-1.80s;animation-duration:2.96s" cx="1029" cy="355" r="1.6" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-63px;animation-delay:-0.78s;animation-duration:2.61s" cx="783" cy="344" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-54px;animation-delay:-1.02s;animation-duration:2.89s" cx="787" cy="361" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-17px;animation-delay:-0.07s;animation-duration:3.20s" cx="842" cy="344" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-91px;animation-delay:-0.30s;animation-duration:2.77s" cx="833" cy="358" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-5px;animation-delay:-1.87s;animation-duration:2.10s" cx="809" cy="349" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:93px;animation-delay:-2.44s;animation-duration:2.41s" cx="1069" cy="355" r="1" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-86px;animation-delay:-1.61s;animation-duration:3.26s" cx="1013" cy="351" r="1.3" fill="#ffc27a"/>
+<circle class="spark" style="--dx:-19px;animation-delay:-1.92s;animation-duration:3.11s" cx="1046" cy="359" r="1" fill="#ffc27a"/>
+<rect y="500" width="1200" height="80" fill="#0d0907"/><line x1="0" y1="500" x2="1200" y2="500" stroke="#2a1f17"/>
+<ellipse cx="900" cy="505" rx="300" ry="14" fill="#ff7a2f" opacity=".12"/>
+</svg>
+  <div class="wrap">
+    <div class="lbl">Industry project · Tecnológico de Monterrey · Mar – Apr 2026</div>
+    <h1 data-es="&lt;span class=&quot;w&quot;&gt;Predecir&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;la energía&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;del&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;em&gt;horno de arco&lt;/em&gt;&lt;/span&gt;"><span class="w">Predicting</span> <span class="w"><em>arc furnace</em></span> <span class="w">energy</span> <span class="w">use</span></h1>
+    <p class="sub">With Ternium, we combined classical statistics and machine learning on the plant's historical heat data to predict the electricity an electric arc furnace needs per ton of steel, and to find the levers that reduce it.</p>
+    <div class="meta"><span>José Rodrigo Ramos García</span><span>Industrial &amp; Systems Engineering</span><span>Process Improvement with Statistical Methods</span><span>Team of 6</span></div>
+    <div class="kpis">
+      <div><b data-c>0.82</b><span>R² · 5-fold cross-validation</span></div>
+      <div><b>8</b><span>Pipeline steps</span></div>
+      <div><b data-c>1.04%</b><span>Mean percentage error</span></div>
+      <div class="hot"><b>10,000</b><span>Scenarios simulated</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="nav" aria-label="Sections">
+  <div class="wrap">
+    <a href="#context">Context</a><a href="#approach">Approach</a><a href="#analysis">Analysis</a><a href="#leakage">Leakage</a><a href="#model">Model</a><a href="#results">Results</a><a href="#simulation">Simulation</a><a href="#improve">Improve &amp; control</a><a href="#outcome">My role</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section id="context" aria-labelledby="h-context">
+    <div class="sh"><div class="lbl">01 · Context</div>
+      <h2 id="h-context">Electricity is the biggest variable cost of an arc furnace</h2>
+      <p>An electric arc furnace melts scrap and direct-reduced iron (DRI) with an electric arc between graphite electrodes. Every heat uses a slightly different charge, recipe and operating time, so energy per ton varies from heat to heat. Ternium asked us to understand that variation with data.</p></div>
+    <p class="quote">The question: <b>which variables really drive energy per ton</b>, and can we predict it before the heat starts?</p>
+    <div class="grid3">
+      <div class="panel"><h3>Data</h3><p class="muted small">Historical heat records with dozens of variables per heat: charge mix, chemistry inputs, oxygen and carbon injection, power, delays and steel grade.</p></div>
+      <div class="panel"><h3>Response variable</h3><p class="muted small">Electric energy per ton of liquid steel (kWh/t), with tapping temperature as a quality constraint that any recommendation must respect.</p></div>
+      <div class="panel"><h3>Toolkit</h3><div class="chips"><span class="chip">Python</span><span class="chip">pandas</span><span class="chip">scikit-learn</span><span class="chip">Optuna</span><span class="chip">SciPy</span><span class="chip">SPC</span></div></div>
+    </div>
+    <div class="cycle" id="cycle">
+      <div class="cyc-top"><h3>One heat, step by step</h3><span class="note" style="margin:0">Where the electricity goes · illustrative</span></div>
+      <div class="stages">
+        <div class="stg"><span class="k">01 · CHARGE</span><b>Load the bucket</b><p>Scrap and DRI drop onto the hot heel left from the last heat.</p></div>
+        <div class="stg"><span class="k">02 · MELT</span><b>Strike the arc</b><p>Electrodes bore into the charge. Most of the electricity is spent here.</p></div>
+        <div class="stg"><span class="k">03 · REFINE</span><b>Oxygen, carbon, lime</b><p>Chemical energy and a foamy slag help heat the bath efficiently.</p></div>
+        <div class="stg"><span class="k">04 · TAP</span><b>Pour the steel</b><p>Steel leaves at the target temperature. Part stays as the next hot heel.</p></div>
+      </div>
+      <div class="meter"><span>ENERGY</span><span class="bar"><i id="mtr"></i></span><b id="mtr-v">0%</b></div>
+    </div>
+  </section>
+
+  <section id="approach" aria-labelledby="h-approach">
+    <div class="sh"><div class="lbl">02 · Approach</div><h2 id="h-approach">Three phases, one question</h2>
+      <p>We followed a DMAIC-style path: frame the problem, prove the causes with statistics, then build a model and turn it into actions that last.</p></div>
+    <div class="phases">
+      <div class="ph"><div class="n">01</div><h3>Define</h3><p>Problem statement, objective and scope; SIPOC and project charter.</p><div class="chips"><span class="chip">SIPOC</span><span class="chip">Charter</span></div></div>
+      <div class="ph"><div class="n">02</div><h3>Analyze</h3><p>Process map, root causes, risk analysis and statistical validation of each cause.</p><div class="chips"><span class="chip">VSM</span><span class="chip">Ishikawa</span><span class="chip">FMEA</span><span class="chip">Hypothesis tests</span></div></div>
+      <div class="ph mid"><div class="n">03</div><h3>Model &amp; improve</h3><p>Random Forest model, scenario simulation, improvement proposals and a control plan.</p><div class="chips"><span class="chip">Random Forest</span><span class="chip">Optuna</span><span class="chip">SPC</span></div></div>
+    </div>
+  </section>
+
+  <section id="analysis" aria-labelledby="h-analysis">
+    <div class="sh"><div class="lbl">03 · Statistical analysis</div><h2 id="h-analysis">Proving the causes before modeling them</h2>
+      <p>We prioritized causes by impact on energy and by whether data could test them, then chose a statistical test for each type of relationship.</p></div>
+    <div class="grid2">
+      <div class="panel"><h3>Which test for which question</h3>
+        <ul>
+          <li><b>Pearson &amp; Spearman:</b> linear and monotonic relationships between each input and energy, to spot variables that have an optimum rather than a straight line.</li>
+          <li><b>ANOVA:</b> whether energy differs between steel grade families, which would justify grade-specific recipes.</li>
+          <li><b>Chi-square:</b> whether some grades are linked to missing the target tapping temperature.</li>
+          <li><b>Shapiro-Wilk:</b> whether energy is close to normal, a requirement before using parametric SPC charts.</li>
+        </ul></div>
+      <div class="panel"><h3>Variables, classified</h3>
+        <p class="muted small" style="margin-bottom:12px">The columns were sorted by what an operator can act on. Outliers were kept and reported: in steelmaking they are real heats, not errors.</p>
+        <div class="chips"><span class="chip" style="color:var(--ok)">Controllable</span><span class="chip">Charge (not controllable)</span><span class="chip">Categorical</span><span class="chip" style="color:var(--arc)">Engineered</span><span class="chip" style="color:var(--bad)">Excluded for leakage</span></div>
+      </div>
+    </div>
+    <h3 style="font-size:26px;margin:36px 0 14px">Factors that drive energy in an arc furnace</h3>
+    <div class="rank">
+      <div class="rk"><span class="i">•</span><div><b>Hot heel per ton</b><small>Liquid steel left in the furnace from the previous heat: a warmer start needs less electricity.</small></div><span class="t n">Charge</span></div>
+      <div class="rk"><span class="i">•</span><div><b>Hot heel × DRI share</b><small>An interaction feature we built to capture how the hot heel and the charge mix work together.</small></div><span class="t e">Engineered</span></div>
+      <div class="rk"><span class="i">•</span><div><b>Operational delays</b><small>Unplanned stops let the bath cool, and energy is spent to recover temperature.</small></div><span class="t c">Controllable</span></div>
+      <div class="rk"><span class="i">•</span><div><b>Lime per ton</b><small>Affects slag basicity and how well heat transfers to the bath.</small></div><span class="t c">Controllable</span></div>
+      <div class="rk"><span class="i">•</span><div><b>Transformer power</b><small>Higher power shortens arc time and the heat losses that come with it.</small></div><span class="t c">Controllable</span></div>
+    </div>
+    <p class="note">These are well-known factors in arc furnace steelmaking. Our job was to test each one with statistics before putting it in the model.</p>
+  </section>
+
+  <section id="leakage" aria-labelledby="h-leak">
+    <div class="sh"><div class="lbl">04 · Interactive · Data leakage</div><h2 id="h-leak">The trap we had to avoid</h2>
+      <p>Some columns are almost the answer itself. If the model sees them, it learns a formula, not the process, and its accuracy looks great but is useless before the heat starts.</p></div>
+    <div class="leak" id="leak" data-mode="leak">
+      <div class="formula">
+        <div class="eq">energy per ton ≈ <span>power</span> × <span>arc-on time</span> ÷ <span>tons tapped</span></div>
+        <div class="toggle" role="group" aria-label="Model inputs">
+          <button type="button" data-mode="leak" aria-pressed="true">Include every column</button>
+          <button type="button" data-mode="honest" aria-pressed="false">Remove leakage</button>
+        </div>
+        <div class="vars" aria-label="Model input variables">
+          <span class="var">Hot heel per ton</span><span class="var">DRI share</span><span class="var">Lime per ton</span><span class="var">Oxygen per ton</span><span class="var">Carbon injection</span><span class="var">Transformer power</span><span class="var">Delays</span><span class="var">Steel grade</span>
+          <span class="var lk">Arc-on time</span><span class="var lk">Tap-to-tap time</span><span class="var lk">Tons tapped</span><span class="var lk">Total energy</span><span class="var lk">Energy standard</span><span class="var lk">Final chemistry</span>
+        </div>
+      </div>
+      <div class="verdict" aria-live="polite">
+        <div class="gauge"><svg viewBox="0 0 260 150" role="img" aria-label="Model score gauge">
+          <path class="g-track" d="M20 130 A110 110 0 0 1 240 130" fill="none" stroke="#2e261f" stroke-width="16" stroke-linecap="round"/>
+          <path d="M20 130 A110 110 0 0 1 240 130" fill="none" stroke="url(#gg)" stroke-width="16" stroke-linecap="round" stroke-dasharray="345.6" stroke-dashoffset="0" opacity=".85"/>
+          <defs><linearGradient id="gg" x1="0" x2="1"><stop class="g-s0" offset="0" stop-color="#3a2f26"/><stop offset=".7" stop-color="#62d69a"/><stop offset=".92" stop-color="#62d69a"/><stop offset="1" stop-color="#ff6b5e"/></linearGradient></defs>
+          <g class="g-tick"><line x1="42.0" y1="130.0" x2="30.0" y2="130.0"/><line x1="42.5" y1="101.6" x2="34.9" y2="99.1"/><line x1="55.6" y1="75.9" x2="49.1" y2="71.2"/><line x1="75.9" y1="55.6" x2="71.2" y2="49.1"/><line x1="101.6" y1="42.5" x2="99.1" y2="34.9"/><line x1="130.0" y1="42.0" x2="130.0" y2="30.0"/><line x1="158.4" y1="42.5" x2="160.9" y2="34.9"/><line x1="184.1" y1="55.6" x2="188.8" y2="49.1"/><line x1="204.4" y1="75.9" x2="210.9" y2="71.2"/><line x1="217.5" y1="101.6" x2="225.1" y2="99.1"/><line x1="218.0" y1="130.0" x2="230.0" y2="130.0"/></g><g class="needle" id="needle"><path class="g-nd" d="M126 130 L130 40 L134 130 Z"/><circle class="g-hub" cx="130" cy="130" r="9"/><circle class="g-hub2" cx="130" cy="130" r="3.5"/></g>
+          <text class="gl" x="16" y="148">0</text><text class="gl" x="232" y="148">1.0</text>
+        </svg><div class="gv" id="gv" style="font-family:var(--head);font-size:30px;font-weight:800;margin-top:-6px"></div></div>
+        <h3 id="v-h"></h3><p id="v-p"></p></div>
+    </div>
+  </section>
+
+  <section id="model" aria-labelledby="h-model">
+    <div class="sh"><div class="lbl">05 · Interactive · Machine learning pipeline</div><h2 id="h-model">Eight steps from raw data to a decision tool</h2><p>Select a step, or play the whole pipeline.</p></div>
+    <div class="pp"><button class="btn" id="play" type="button" style="border-color:var(--arc-line);color:var(--arc)">▶ Play pipeline</button><span class="note" id="pp-s" style="margin:0"></span></div>
+    <div class="pipe" role="group" aria-label="Pipeline steps">
+      <button class="st" data-i="0" aria-pressed="true"><span class="k">01</span><span class="t">Data cleaning</span></button>
+      <button class="st" data-i="1" aria-pressed="false"><span class="k">02</span><span class="t">Leakage control</span></button>
+      <button class="st" data-i="2" aria-pressed="false"><span class="k">03</span><span class="t">Feature engineering</span></button>
+      <button class="st" data-i="3" aria-pressed="false"><span class="k">04</span><span class="t">Incremental Random Forest</span></button>
+      <button class="st" data-i="4" aria-pressed="false"><span class="k">05</span><span class="t">Bayesian tuning</span></button>
+      <button class="st" data-i="5" aria-pressed="false"><span class="k">06</span><span class="t">Honest evaluation</span></button>
+      <button class="st" data-i="6" aria-pressed="false"><span class="k">07</span><span class="t">Quality constraint</span></button>
+      <button class="st" data-i="7" aria-pressed="false"><span class="k">08</span><span class="t">Scenario simulation</span></button>
+    </div>
+    <div class="detail" aria-live="polite"><div><h3 id="p-h"></h3><p id="p-p"></p></div><div class="fig"><b id="p-f"></b><span id="p-u"></span></div><div class="prog" id="prog"><i></i></div></div>
+  </section>
+
+  <section id="results" aria-labelledby="h-res">
+    <div class="sh"><div class="lbl">06 · Results</div><h2 id="h-res">About 1% error per heat</h2>
+      <p>Measured on heats the model never saw during training, and confirmed with 5-fold cross-validation.</p></div>
+    <div class="feed">
+      <div class="feed-t"><h3>Live prediction feed</h3><p class="muted small">How the model would look in the control room: before each heat it predicts the energy, and after the heat the real value is compared. Hover the chart to inspect a heat.</p></div>
+      <div class="hmi">
+    <div class="hmi-h"><span><span class="live">●</span> Heat prediction</span><span>Illustrative</span></div>
+    <canvas id="hmi" width="680" height="220" role="img" aria-label="Illustrative stream of actual versus predicted energy per heat; hover to pause and inspect a heat."></canvas>
+    <div class="hmi-k"><span><i style="background:#ff7a2f"></i>Actual</span><span><i style="background:#7fd3ff"></i>Predicted</span><span style="margin-left:auto;color:var(--fg-3)">Hover to inspect</span></div>
+    <div class="hmi-f"><span>Heat <b id="hh">1,742</b></span><span class="er">Error <b id="he">0.8%</b></span></div>
+  </div>
+    </div>
+    <div class="metrics">
+      <div class="mt key"><b>1.04%</b><div class="nm">MAPE · Mean percentage error</div><p>On average, the prediction misses the real energy by about one percent per heat. This is the number operations cares about.</p></div>
+      <div class="mt"><b>0.82</b><div class="nm">R² · 5-fold cross-validation</div><p>The model explains over 80% of the heat-to-heat variation in energy, on heats it never saw.</p></div>
+      <div class="mt"><b>20%</b><div class="nm">Held-out test heats</div><p>Share of heats kept out of training and used only to measure the error.</p></div>
+    </div>
+    <div class="panel honest">
+      <div><h3>Which R² to trust</h3><p class="muted small">A single test split can be lucky. Cross-validation averages five different splits, so we report 0.82 as the honest estimate, and the out-of-bag score agrees.</p></div>
+      <div class="cmp" role="img" aria-label="R squared: test split 0.96, out-of-bag 0.83, 5-fold cross-validation 0.82.">
+        <div class="row"><span>Test split</span><span class="tr"><i style="width:96.2%;background:var(--fg-3)"></i></span><span class="v">0.96</span></div>
+        <div class="row"><span>Out-of-bag</span><span class="tr"><i style="width:82.7%;background:var(--arc)"></i></span><span class="v">0.83</span></div>
+        <div class="row"><span>5-fold CV ✓</span><span class="tr"><i style="width:82.1%;background:var(--arc);box-shadow:0 0 12px rgba(127,211,255,.6)"></i></span><span class="v">0.82</span></div>
+      </div>
+    </div>
+    <div class="charts">
+      <div class="chart"><h3>Predicted vs. actual</h3><p class="muted small">Each dot is a held-out heat. Dots on the diagonal are perfect predictions; the band is ±1%.</p><canvas id="par" width="620" height="420" role="img" aria-label="Illustrative parity plot: predicted against actual energy, points clustered along the diagonal within a plus or minus one percent band."></canvas><p class="note">Illustrative, normalized data with the same error level as the model.</p></div>
+      <div class="chart"><h3>Training loop with early stopping</h3><p class="muted small">Each round adds 50 trees. Training stops once the test score stops improving, keeping the train–test gap under 0.12.</p><canvas id="trn" width="620" height="420" role="img" aria-label="Illustrative training curves: training score rises above test score; training stops when test score plateaus, with the gap under 0.12."></canvas><p class="note">Illustrative curves of the method; final out-of-bag R² was 0.83.</p></div>
+    </div>
+  </section>
+
+  <section id="simulation" aria-labelledby="h-sim">
+    <div class="sh"><div class="lbl">07 · Interactive · Scenario simulation</div><h2 id="h-sim">Lowest energy that still meets quality</h2>
+      <p>The model scored 10,000 simulated operating configurations. A second model predicted tapping temperature, so only configurations within the quality window count. Here is the method with synthetic data.</p></div>
+    <div class="sim">
+      <div>
+        <canvas id="cv" width="760" height="460" role="img" aria-label="Scatter of simulated configurations: energy against predicted tapping temperature, with the quality window shaded and the best feasible point highlighted."></canvas>
+        <div class="legend"><span><i style="background:#5a4d42"></i>Outside quality window</span><span><i style="background:var(--arc)"></i>Feasible</span><span><i style="background:var(--melt)"></i>Lowest-energy feasible</span></div>
+      </div>
+      <div class="ctrl">
+        <label for="tol"><span class="row"><span>Quality window (± temperature)</span><span id="tol-v"></span></span><input type="range" id="tol" min="5" max="40" value="15"></label>
+        <label for="n"><span class="row"><span>Configurations simulated</span><span id="n-v"></span></span><input type="range" id="n" min="500" max="10000" step="500" value="10000"></label>
+        <div class="out">
+          <div><b id="o-f"></b><span>Feasible configurations</span></div>
+          <div class="best"><b id="o-s"></b><span>Energy vs. typical heat</span></div>
+        </div>
+        <p class="muted small">A tighter window protects quality but leaves fewer options, so the achievable saving shrinks. That trade-off is the decision the plant makes.</p>
+        <button class="btn" id="resim" type="button">Simulate again</button>
+        <p class="note">Synthetic, normalized data to illustrate the method. With this method, the project identified a savings potential for the plant.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="improve" aria-labelledby="h-imp">
+    <div class="sh"><div class="lbl">08 · Improve &amp; control</div><h2 id="h-imp">From a model to daily decisions</h2></div>
+    <div class="imp">
+      <div class="panel"><h3><i style="background:var(--ok)"></i>Quick wins</h3><ul><li>Track kWh/t per heat against a target</li><li>Attack the most frequent delay causes</li><li>Standardize key settings across shifts</li><li>Review lime use per ton</li><li>Balance oxygen and carbon injection</li></ul></div>
+      <div class="panel"><h3><i style="background:var(--melt)"></i>Operational</h3><ul><li>Adjust the charge recipe (DRI–scrap mix) to the material available</li></ul></div>
+      <div class="panel"><h3><i style="background:var(--arc)"></i>Analytical</h3><ul><li>Predict expected energy before each heat</li><li>Alert when a heat is at risk of high consumption</li></ul></div>
+      <div class="panel"><h3><i style="background:var(--fg-2)"></i>Strategic</h3><ul><li>Grow the model into a digital twin of the furnace</li><li>Run virtual DOE to test settings without risk</li></ul></div>
+    </div>
+    <div class="chart spc"><h3>Control plan in action · X̄ chart of energy per heat</h3><p class="muted small">Daily review: each point is a heat; a point outside the limits triggers a review of that heat.</p><canvas id="spc" width="1100" height="300" role="img" aria-label="Illustrative live control chart with center line and control limits; points stream in and out-of-limit points are flagged."></canvas>
+      <div class="spc-k"><span><i style="background:#c4b7a8"></i>Center line</span><span><i style="background:#ff6b5e"></i>Control limits</span><span><i style="background:#7fd3ff"></i>Heats</span><span>Illustrative data</span></div></div>
+    <div class="ctl">
+      <div><span class="f">Daily</span><b>Critical variables</b><p>Controllable variables and per-heat deviations. Owner: process engineer.</p></div>
+      <div><span class="f">Weekly</span><b>Aggregated KPIs</b><p>X-R charts, Cp / Cpk and false alerts from the model. Owner: data analyst.</p></div>
+      <div><span class="f">Monthly</span><b>Savings &amp; retraining</b><p>Accumulated energy savings; retrain the model if it drifts. Owner: plant supervisor.</p></div>
+    </div>
+  </section>
+
+  <section id="outcome" aria-labelledby="h-out">
+    <div class="sh"><div class="lbl">09 · Outcome</div><h2 id="h-out">Feedback and my role</h2></div>
+    <div class="closing">
+      <div class="fb"><div class="lbl">Instructor feedback</div><p>Very rigorous variable analysis, good handling of data leakage, a well-justified Random Forest and Optuna, and a correct distinction between test and cross-validation R².</p></div>
+      <div class="panel"><h3>My role</h3>
+        <p class="muted">Co-developed the Python code, mainly the energy prediction model (cleaning, leakage control, incremental Random Forest training loop and Optuna tuning) and the scenario simulation that searches 10,000 configurations for the lowest energy within the quality constraint.</p>
+        <div class="chips" style="margin-top:14px"><span class="chip">Python</span><span class="chip">scikit-learn</span><span class="chip">Random Forest</span><span class="chip">Optuna</span><span class="chip">Simulation</span><span class="chip">Hypothesis testing</span><span class="chip">SPC · Cp / Cpk</span><span class="chip">Energy efficiency</span></div>
+        <p class="muted small" style="margin-top:14px">Team of 6 · Course: Organizational Process Improvement with Statistical Methods.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><a href="../" style="color:inherit">← Back to portfolio</a><span>Academic project · Tecnológico de Monterrey · 2026 · No confidential company data included</span><span>José Rodrigo Ramos García · <a href="../traffic-light/">See also: Traffic Light project</a></span></div></footer>
+
+<script>window.__TC=["#0a0806", "#f7f3ee"];window.__CMAP={"hex": {"#c4b7a8": "#54473a", "#8c7e70": "#7a6a5a", "#2e261f": "#e2d9ce", "#f4ece2": "#1f1812", "#0a0806": "#ffffff", "#7fd3ff": "#17809f", "#ff7a2f": "#d9581a", "#62d69a": "#1b8f5a", "#ff6b5e": "#cf3a2d", "#5a4d42": "#b3a594"}, "rgb": {"196,183,168": "84,71,58", "140,126,112": "122,106,90", "46,38,31": "226,217,206", "244,236,226": "31,24,18", "10,8,6": "255,252,247", "127,211,255": "23,128,159", "255,122,47": "217,88,26", "98,214,154": "27,143,90", "255,107,94": "207,58,45", "90,77,66": "150,135,120"}};window.__CKEEP='.keep-dark';
+(function(){var R=document.documentElement,b=document.getElementById("thm"),m=document.querySelector('meta[name="theme-color"]'),M=window.__CMAP;
+  if(M){var keep=window.__CKEEP||".hero";
+    function tc(cv,v){if(typeof v!=="string"||R.getAttribute("data-theme")!=="light"||(cv&&cv.closest&&cv.closest(keep)))return v;
+      var k=v.toLowerCase();if(M.hex[k])return M.hex[k];
+      return v.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/,function(s,r,g,bb){var q=r+","+g+","+bb;return M.rgb[q]?s.replace(/\d+\s*,\s*\d+\s*,\s*\d+/,M.rgb[q]):s;});}
+    var P=CanvasRenderingContext2D.prototype;["fillStyle","strokeStyle","shadowColor"].forEach(function(p){var d=Object.getOwnPropertyDescriptor(P,p);
+      Object.defineProperty(P,p,{configurable:true,get:d.get,set:function(v){d.set.call(this,tc(this.canvas,v));}});});
+    var ag=CanvasGradient.prototype.addColorStop;window.__gcv=null;
+    var cl=P.createLinearGradient,cr=P.createRadialGradient;
+    P.createLinearGradient=function(){var g=cl.apply(this,arguments);g.__cv=this.canvas;return g;};
+    P.createRadialGradient=function(){var g=cr.apply(this,arguments);g.__cv=this.canvas;return g;};
+    CanvasGradient.prototype.addColorStop=function(o,c){return ag.call(this,o,tc(this.__cv,c));};}
+  function set(t){R.setAttribute("data-theme",t);try{localStorage.setItem("theme",t)}catch(e){}
+    b.setAttribute("aria-label",t==="dark"?"Switch to light mode":"Switch to dark mode");
+    if(m)m.setAttribute("content",t==="dark"?window.__TC[0]:window.__TC[1]);
+    document.dispatchEvent(new Event("themechange"));}
+  b.addEventListener("click",function(){set(R.getAttribute("data-theme")==="dark"?"light":"dark");});
+  set(R.getAttribute("data-theme")||"dark");})();
+
+(function(){if(!("IntersectionObserver" in window))return;
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){var on=e.isIntersecting;e.target.classList.toggle("off",!on);
+    [].forEach.call(e.target.querySelectorAll("svg"),function(s){if(s.pauseAnimations){on?s.unpauseAnimations():s.pauseAnimations();}});});},{rootMargin:"120px"});
+  [].forEach.call(document.querySelectorAll(".hero,main section,body > section"),function(x){io.observe(x);});})();
+</script>
+<script>window.__I18N={D:{"Portfolio": "Portafolio", "Index": "Índice", "Top": "Inicio", "Industry project · Tecnológico de Monterrey · Mar – Apr 2026": "Proyecto con empresa · Tecnológico de Monterrey · mar – abr 2026", "Industrial & Systems Engineering": "Ingeniería Industrial y de Sistemas", "Process Improvement with Statistical Methods": "Mejora de Procesos con Métodos Estadísticos", "Team of 6": "Equipo de 6", "R² · 5-fold cross-validation": "R² · validación cruzada de 5 particiones", "Mean percentage error": "Error porcentual medio", "Context": "Contexto", "Approach": "Enfoque", "Analysis": "Análisis", "Leakage": "Fuga de datos", "Model": "Modelo", "Results": "Resultados", "Simulation": "Simulación", "Improve & control": "Mejora y control", "My role": "Mi rol", "01 · Context": "01 · Contexto", "Electricity is the biggest variable cost of an arc furnace": "La electricidad es el mayor costo variable de un horno de arco", "An electric arc furnace melts scrap and direct-reduced iron (DRI) with an electric arc between graphite electrodes. Every heat uses a slightly different charge, recipe and operating time, so energy per ton varies from heat to heat. Ternium asked us to understand that variation with data.": "Un horno de arco eléctrico funde chatarra y hierro de reducción directa (DRI) con un arco eléctrico entre electrodos de grafito. Cada colada usa una carga, una receta y un tiempo de operación un poco distintos, así que la energía por tonelada varía de colada a colada. Ternium nos pidió entender esa variación con datos.", "The question:": "La pregunta:", "which variables really drive energy per ton": "qué variables determinan de verdad la energía por tonelada", ", and can we predict it before the heat starts?": ", ¿y podemos predecirla antes de que empiece la colada?", "Data": "Datos", "Response variable": "Variable de respuesta", "Electric energy per ton of liquid steel (kWh/t), with tapping temperature as a quality constraint that any recommendation must respect.": "Energía eléctrica por tonelada de acero líquido (kWh/t), con la temperatura de vaciado como restricción de calidad que cualquier recomendación debe respetar.", "Toolkit": "Herramientas", "One heat, step by step": "Una colada, paso a paso", "Where the electricity goes · illustrative": "A dónde va la electricidad · ilustrativo", "01 · CHARGE": "01 · CARGA", "Load the bucket": "Cargar la canasta", "Scrap and DRI drop onto the hot heel left from the last heat.": "La chatarra y el DRI caen sobre el pie líquido que dejó la colada anterior.", "02 · MELT": "02 · FUSIÓN", "Strike the arc": "Encender el arco", "Electrodes bore into the charge. Most of the electricity is spent here.": "Los electrodos perforan la carga. Aquí se gasta la mayor parte de la electricidad.", "03 · REFINE": "03 · AFINACIÓN", "Oxygen, carbon, lime": "Oxígeno, carbono, cal", "Chemical energy and a foamy slag help heat the bath efficiently.": "La energía química y una escoria espumosa ayudan a calentar el baño de forma eficiente.", "04 · TAP": "04 · VACIADO", "Pour the steel": "Vaciar el acero", "Steel leaves at the target temperature. Part stays as the next hot heel.": "El acero sale a la temperatura objetivo. Una parte se queda como el siguiente pie líquido.", "ENERGY": "ENERGÍA", "next heat": "siguiente colada", "02 · Approach": "02 · Enfoque", "Three phases, one question": "Tres fases, una pregunta", "We followed a DMAIC-style path: frame the problem, prove the causes with statistics, then build a model and turn it into actions that last.": "Seguimos una ruta tipo DMAIC: plantear el problema, probar las causas con estadística, y luego construir un modelo y convertirlo en acciones que perduren.", "Define": "Definir", "Problem statement, objective and scope; SIPOC and project charter.": "Planteamiento del problema, objetivo y alcance; SIPOC y project charter.", "Analyze": "Analizar", "Process map, root causes, risk analysis and statistical validation of each cause.": "Mapa de proceso, causas raíz, análisis de riesgos y validación estadística de cada causa.", "FMEA": "AMEF", "Hypothesis tests": "Pruebas de hipótesis", "Model & improve": "Modelar y mejorar", "Random Forest model, scenario simulation, improvement proposals and a control plan.": "Modelo Random Forest, simulación de escenarios, propuestas de mejora y plan de control.", "03 · Statistical analysis": "03 · Análisis estadístico", "Proving the causes before modeling them": "Probar las causas antes de modelarlas", "We prioritized causes by impact on energy and by whether data could test them, then chose a statistical test for each type of relationship.": "Priorizamos las causas por su impacto en la energía y por si los datos podían probarlas, y luego elegimos una prueba estadística para cada tipo de relación.", "Tests and what they showed": "Pruebas y lo que mostraron", "Pearson & Spearman:": "Pearson y Spearman:", "Chi-square:": "Chi-cuadrada:", "Variables, classified": "Variables, clasificadas", "Hot heel per ton": "Pie líquido por tonelada", "Liquid steel left in the furnace from the previous heat: a warmer start needs less electricity.": "Acero líquido que queda en el horno de la colada anterior: un arranque más caliente necesita menos electricidad.", "Charge": "Carga", "Hot heel × DRI share": "Pie líquido × proporción de DRI", "Engineered": "Construida", "Operational delays": "Demoras operativas", "Unplanned stops let the bath cool, and energy is spent to recover temperature.": "Las paradas no planeadas dejan enfriar el baño, y se gasta energía para recuperar la temperatura.", "Controllable": "Controlable", "Lime per ton": "Cal por tonelada", "Affects slag basicity and how well heat transfers to the bath.": "Afecta la basicidad de la escoria y qué tan bien se transfiere el calor al baño.", "Transformer power": "Potencia del transformador", "Higher power shortens arc time and the heat losses that come with it.": "Más potencia acorta el tiempo de arco y las pérdidas de calor que lo acompañan.", "04 · Interactive · Data leakage": "04 · Interactivo · Fuga de datos", "The trap we had to avoid": "La trampa que tuvimos que evitar", "Some columns are almost the answer itself. If the model sees them, it learns a formula, not the process, and its accuracy looks great but is useless before the heat starts.": "Algunas columnas son casi la respuesta misma. Si el modelo las ve, aprende una fórmula y no el proceso: su precisión se ve excelente, pero no sirve antes de que empiece la colada.", "energy per ton ≈": "energía por tonelada ≈", "power": "potencia", "arc-on time": "tiempo de arco", "tons tapped": "toneladas vaciadas", "Include every column": "Incluir todas las columnas", "Remove leakage": "Quitar la fuga", "DRI share": "Proporción de DRI", "Oxygen per ton": "Oxígeno por tonelada", "Carbon injection": "Inyección de carbono", "Delays": "Demoras", "Steel grade": "Grado de acero", "Arc-on time": "Tiempo de arco", "Tap-to-tap time": "Tiempo tap-to-tap", "Tons tapped": "Toneladas vaciadas", "Total energy": "Energía total", "Energy standard": "Estándar de energía", "Final chemistry": "Química final", "Looks perfect, predicts nothing": "Se ve perfecto, no predice nada", "With arc-on time and tons tapped as inputs, the model just rebuilds the formula above. Its score would look almost perfect, but those values only exist after the heat ends, so it cannot help plan one.": "Con el tiempo de arco y las toneladas vaciadas como entradas, el modelo solo reconstruye la fórmula de arriba. Su puntaje se vería casi perfecto, pero esos valores solo existen cuando termina la colada, así que no sirve para planearla.", "Honest model: R² 0.82 in cross-validation": "Modelo honesto: R² 0.82 en validación cruzada", "05 · Interactive · Machine learning pipeline": "05 · Interactivo · Pipeline de machine learning", "Eight steps from raw data to a decision tool": "Ocho pasos de los datos crudos a una herramienta de decisión", "Select a step, or play the whole pipeline.": "Selecciona un paso o reproduce todo el pipeline.", "▶ Play pipeline": "▶ Reproducir pipeline", "❚❚ Pause": "❚❚ Pausa", "Data cleaning": "Limpieza de datos", "Leakage control": "Control de fuga", "Feature engineering": "Ingeniería de variables", "Incremental Random Forest": "Random Forest incremental", "Bayesian tuning": "Ajuste bayesiano", "Honest evaluation": "Evaluación honesta", "Quality constraint": "Restricción de calidad", "Scenario simulation": "Simulación de escenarios", "Physical-range filters removed impossible values, out-of-range tap-to-tap times and anomalous energies. Outliers that were real heats were kept and reported, not deleted.": "Filtros de rango físico eliminaron valores imposibles, tiempos tap-to-tap fuera de rango y energías anómalas. Los atípicos que eran coladas reales se conservaron y reportaron, no se borraron.", "Columns that are formulas of energy (arc-on time, tap-to-tap, tons tapped) or that exist only at the end of the heat were excluded from the inputs.": "Se excluyeron de las entradas las columnas que son fórmulas de la energía (tiempo de arco, tap-to-tap, toneladas vaciadas) o que solo existen al final de la colada.", "Built metallurgical interactions, such as hot heel × DRI share, total carbon per ton and lime ratio. Steel grade and shift were target-encoded.": "Construimos interacciones metalúrgicas, como pie líquido × proporción de DRI, carbono total por tonelada y relación de cal. El grado de acero y el turno se codificaron con target encoding.", "Training loop that adds 50 trees per round with warm start, tracks the out-of-bag score and stops early when the train–test gap signals overfitting.": "Ciclo de entrenamiento que agrega 50 árboles por ronda con warm start, sigue el puntaje out-of-bag y se detiene antes cuando la brecha entre entrenamiento y prueba indica sobreajuste.", "Optuna searched depth, number of trees, minimum samples and features per split, instead of a blind grid search.": "Optuna buscó la profundidad, el número de árboles, el mínimo de muestras y las variables por división, en lugar de una búsqueda en malla a ciegas.", "20% of heats held out for testing, plus 5-fold cross-validation as the honest estimate of performance on future heats.": "20% de las coladas se apartaron para prueba, más validación cruzada de 5 particiones como estimación honesta del desempeño en coladas futuras.", "A second model predicts tapping temperature, so any low-energy recommendation must also keep steel quality in range.": "Un segundo modelo predice la temperatura de vaciado, así que cualquier recomendación de baja energía también debe mantener la calidad del acero en rango.", "Simulated operating configurations and searched for the lowest energy that still meets the quality constraint.": "Se simularon configuraciones de operación y se buscó la menor energía que aún cumple la restricción de calidad.", "valid heats": "coladas válidas", "train–test gap": "brecha entrenamiento–prueba", "Optuna trials": "pruebas de Optuna", "R² · 5-fold CV": "R² · VC de 5 particiones", "models": "modelos", "scenarios": "escenarios", "06 · Results": "06 · Resultados", "About 1% error per heat": "Cerca de 1% de error por colada", "Live prediction feed": "Predicción en vivo", "How the model would look in the control room: before each heat it predicts the energy, and after the heat the real value is compared. Hover the chart to inspect a heat.": "Así se vería el modelo en el cuarto de control: antes de cada colada predice la energía y, al terminar, se compara con el valor real. Pasa el cursor sobre la gráfica para inspeccionar una colada.", "Heat prediction": "Predicción por colada", "Illustrative": "Ilustrativo", "Actual": "Real", "Predicted": "Predicho", "Hover to inspect": "Pasa el cursor para inspeccionar", "Heat": "Colada", "Error": "Error", "The error relative to real consumption, about one percent per heat.": "El error relativo al consumo real, cerca de uno por ciento por colada.", "Which R² to trust": "En qué R² confiar", "A single test split can be lucky. Cross-validation averages five different splits, so we report 0.82 as the honest estimate, and the out-of-bag score agrees.": "Una sola partición de prueba puede tener suerte. La validación cruzada promedia cinco particiones distintas, así que reportamos 0.82 como la estimación honesta, y el puntaje out-of-bag coincide.", "Test split": "Partición de prueba", "5-fold CV ✓": "VC 5 particiones ✓", "Predicted vs. actual": "Predicho vs. real", "Each dot is a held-out heat. Dots on the diagonal are perfect predictions; the band is ±1%.": "Cada punto es una colada apartada. Los puntos sobre la diagonal son predicciones perfectas; la banda es ±1%.", "Illustrative, normalized data with the same error level as the model.": "Datos ilustrativos y normalizados con el mismo nivel de error que el modelo.", "Training loop with early stopping": "Ciclo de entrenamiento con paro temprano", "Each round adds 50 trees. Training stops once the test score stops improving, keeping the train–test gap under 0.12.": "Cada ronda agrega 50 árboles. El entrenamiento se detiene cuando el puntaje de prueba deja de mejorar, y así la brecha entrenamiento–prueba queda debajo de 0.12.", "Illustrative curves of the method; final out-of-bag R² was 0.83.": "Curvas ilustrativas del método; el R² out-of-bag final fue 0.83.", "07 · Interactive · Scenario simulation": "07 · Interactivo · Simulación de escenarios", "Lowest energy that still meets quality": "La menor energía que aún cumple la calidad", "The model scored 10,000 simulated operating configurations. A second model predicted tapping temperature, so only configurations within the quality window count. Here is the method with synthetic data.": "El modelo evaluó 10,000 configuraciones de operación simuladas. Un segundo modelo predijo la temperatura de vaciado, así que solo cuentan las configuraciones dentro de la ventana de calidad. Aquí está el método con datos sintéticos.", "Outside quality window": "Fuera de la ventana de calidad", "Feasible": "Factible", "Lowest-energy feasible": "Factible de menor energía", "Quality window (± temperature)": "Ventana de calidad (± temperatura)", "Configurations simulated": "Configuraciones simuladas", "Feasible configurations": "Configuraciones factibles", "Energy vs. typical heat": "Energía vs. colada típica", "A tighter window protects quality but leaves fewer options, so the achievable saving shrinks. That trade-off is the decision the plant makes.": "Una ventana más estrecha protege la calidad pero deja menos opciones, así que el ahorro alcanzable se reduce. Ese balance es la decisión que toma la planta.", "Simulate again": "Simular de nuevo", "08 · Improve & control": "08 · Mejora y control", "From a model to daily decisions": "De un modelo a decisiones diarias", "Quick wins": "Ganancias rápidas", "Track kWh/t per heat against a target": "Medir los kWh/t de cada colada contra una meta", "Attack the most frequent delay causes": "Atacar las causas de demora más frecuentes", "Standardize key settings across shifts": "Estandarizar los ajustes clave entre turnos", "Review lime use per ton": "Revisar el uso de cal por tonelada", "Balance oxygen and carbon injection": "Balancear la inyección de oxígeno y carbono", "Operational": "Operativas", "Adjust the charge recipe (DRI–scrap mix) to the material available": "Ajustar la receta de carga (mezcla DRI–chatarra) al material disponible", "Analytical": "Analíticas", "Predict expected energy before each heat": "Predecir la energía esperada antes de cada colada", "Alert when a heat is at risk of high consumption": "Alertar cuando una colada esté en riesgo de alto consumo", "Strategic": "Estratégicas", "Grow the model into a digital twin of the furnace": "Convertir el modelo en un gemelo digital del horno", "Run virtual DOE to test settings without risk": "Correr DOE virtuales para probar ajustes sin riesgo", "Control plan in action · X̄ chart of energy per heat": "Plan de control en acción · carta X̄ de energía por colada", "Daily review: each point is a heat; a point outside the limits triggers a review of that heat.": "Revisión diaria: cada punto es una colada; un punto fuera de los límites activa la revisión de esa colada.", "Center line": "Línea central", "Control limits": "Límites de control", "Heats": "Coladas", "Illustrative data": "Datos ilustrativos", "Daily": "Diario", "Critical variables": "Variables críticas", "Controllable variables and per-heat deviations. Owner: process engineer.": "Variables controlables y desviaciones por colada. Responsable: ingeniero de proceso.", "Weekly": "Semanal", "Aggregated KPIs": "KPIs agregados", "X-R charts, Cp / Cpk and false alerts from the model. Owner: data analyst.": "Cartas X-R, Cp / Cpk y falsas alertas del modelo. Responsable: analista de datos.", "Monthly": "Mensual", "Savings & retraining": "Ahorros y reentrenamiento", "Accumulated energy savings; retrain the model if it drifts. Owner: plant supervisor.": "Ahorro de energía acumulado; reentrenar el modelo si se desvía. Responsable: supervisor de planta.", "09 · Outcome": "09 · Resultado", "Feedback and my role": "Retroalimentación y mi rol", "Instructor feedback": "Retroalimentación del profesor", "Very rigorous variable analysis, good handling of data leakage, a well-justified Random Forest and Optuna, and a correct distinction between test and cross-validation R².": "Análisis de variables muy riguroso, buen manejo de la fuga de datos, un Random Forest y un Optuna bien justificados, y una distinción correcta entre el R² de prueba y el de validación cruzada.", "Co-developed the Python code, mainly the energy prediction model (cleaning, leakage control, incremental Random Forest training loop and Optuna tuning) and the scenario simulation that searches 10,000 configurations for the lowest energy within the quality constraint.": "Co-desarrollé el código en Python, sobre todo el modelo de predicción de energía (limpieza, control de fuga, ciclo de entrenamiento incremental de Random Forest y ajuste con Optuna) y la simulación de escenarios que busca entre 10,000 configuraciones la de menor energía dentro de la restricción de calidad.", "Hypothesis testing": "Pruebas de hipótesis", "Energy efficiency": "Eficiencia energética", "Team of 6 · Course: Organizational Process Improvement with Statistical Methods.": "Equipo de 6 · Curso: Mejora de Procesos Organizacionales con Métodos Estadísticos.", "← Back to portfolio": "← Volver al portafolio", "See also: Traffic Light project": "Ver también: proyecto Traffic Light", "Back to portfolio home": "Volver al inicio del portafolio", "Sections": "Secciones", "Model inputs": "Entradas del modelo", "Model input variables": "Variables de entrada del modelo", "Model score gauge": "Indicador del puntaje del modelo", "Pipeline steps": "Pasos del pipeline", "Illustrative stream of actual versus predicted energy per heat; hover to pause and inspect a heat.": "Flujo ilustrativo de energía real contra predicha por colada; pasa el cursor para pausar e inspeccionar una colada.", "R squared: test split 0.96, out-of-bag 0.83, 5-fold cross-validation 0.82.": "R cuadrada: partición de prueba 0.96, out-of-bag 0.83, validación cruzada de 5 particiones 0.82.", "Illustrative parity plot: predicted against actual energy, points clustered along the diagonal within a plus or minus one percent band.": "Gráfica de paridad ilustrativa: energía predicha contra real, con los puntos agrupados sobre la diagonal dentro de una banda de más o menos uno por ciento.", "Illustrative training curves: training score rises above test score; training stops when test score plateaus, with the gap under 0.12.": "Curvas de entrenamiento ilustrativas: el puntaje de entrenamiento sube por encima del de prueba; el entrenamiento se detiene cuando el de prueba se estanca, con la brecha debajo de 0.12.", "Scatter of simulated configurations: energy against predicted tapping temperature, with the quality window shaded and the best feasible point highlighted.": "Dispersión de configuraciones simuladas: energía contra temperatura de vaciado predicha, con la ventana de calidad sombreada y el mejor punto factible resaltado.", "Illustrative live control chart with center line and control limits; points stream in and out-of-limit points are flagged.": "Carta de control en vivo ilustrativa con línea central y límites de control; los puntos entran en flujo y se marcan los que salen de los límites.", "Predicted tapping temperature vs. target (°C)": "Temperatura de vaciado predicha vs. objetivo (°C)", "Energy index (typical heat = 100)": "Índice de energía (colada típica = 100)", "Actual (index)": "Real (índice)", "Predicted (index)": "Predicho (índice)", "Trees": "Árboles", "early stop": "paro temprano", "gap < 0.12": "brecha < 0.12", "— train": "— entrenamiento", "— test": "— prueba", "review heat": "revisar colada", "CL": "LC", "UCL": "LSC", "LCL": "LIC", "Held-out test heats": "Coladas de prueba apartadas", "Scenarios simulated": "Escenarios simulados", "MAPE · Mean percentage error": "MAPE · Error porcentual medio", "On average, the prediction misses the real energy by about one percent per heat. This is the number operations cares about.": "En promedio, la predicción se desvía de la energía real cerca de uno por ciento por colada. Este es el número que le importa a operaciones.", "The model explains over 80% of the heat-to-heat variation in energy, on heats it never saw.": "El modelo explica más del 80% de la variación de energía entre coladas, en coladas que nunca vio.", "Heats kept out of training and used only to measure the error.": "Coladas que se dejaron fuera del entrenamiento y se usaron solo para medir el error.", "Synthetic, normalized data to illustrate the method. With this method, the project identified a savings potential for the plant.": "Datos sintéticos y normalizados para ilustrar el método. Con este método, el proyecto identificó un potencial de ahorro para la planta.", "Academic project · Tecnológico de Monterrey · 2026 · No confidential company data included": "Proyecto académico · Tecnológico de Monterrey · 2026 · No incluye datos confidenciales de la empresa", "Switch to light mode": "Cambiar a modo claro", "Switch to dark mode": "Cambiar a modo oscuro", "Historical heat records with dozens of variables per heat: charge mix, chemistry inputs, oxygen and carbon injection, power, delays and steel grade.": "Registros históricos de coladas con decenas de variables por colada: mezcla de carga, insumos químicos, inyección de oxígeno y carbono, potencia, demoras y grado de acero.", "Which test for which question": "Qué prueba para qué pregunta", "linear and monotonic relationships between each input and energy, to spot variables that have an optimum rather than a straight line.": "relaciones lineales y monótonas entre cada variable y la energía, para detectar variables con un óptimo en lugar de una línea recta.", "whether energy differs between steel grade families, which would justify grade-specific recipes.": "si la energía cambia entre familias de grado de acero, lo que justificaría recetas por grado.", "whether some grades are linked to missing the target tapping temperature.": "si algunos grados se asocian con no alcanzar la temperatura objetivo de vaciado.", "whether energy is close to normal, a requirement before using parametric SPC charts.": "si la energía se acerca a una distribución normal, requisito antes de usar gráficas SPC paramétricas.", "The columns were sorted by what an operator can act on. Outliers were kept and reported: in steelmaking they are real heats, not errors.": "Las columnas se clasificaron según lo que un operador puede controlar. Los atípicos se conservaron y se reportaron: en acería son coladas reales, no errores.", "Charge (not controllable)": "Carga (no controlable)", "Categorical": "Categóricas", "Excluded for leakage": "Excluidas por fuga", "Factors that drive energy in an arc furnace": "Factores que mueven la energía en un horno de arco", "An interaction feature we built to capture how the hot heel and the charge mix work together.": "Una variable de interacción que construimos para capturar cómo trabajan juntos el pie líquido y la mezcla de carga.", "These are well-known factors in arc furnace steelmaking. Our job was to test each one with statistics before putting it in the model.": "Son factores conocidos en la acería con horno de arco. Nuestro trabajo fue probar cada uno con estadística antes de meterlo al modelo.", "Measured on heats the model never saw during training, and confirmed with 5-fold cross-validation.": "Medido en coladas que el modelo nunca vio durante el entrenamiento, y confirmado con validación cruzada de 5 particiones.", "Share of heats kept out of training and used only to measure the error.": "Porcentaje de coladas que se apartaron del entrenamiento y solo se usaron para medir el error.", "We excluded the columns that are formulas of energy or are only known at the end of the heat. The model now learns the process itself and can predict before the heat starts.": "Excluimos las columnas que son fórmulas de la energía o que solo se conocen al final de la colada. Ahora el modelo aprende el proceso y puede predecir antes de que empiece la colada.", "Clean": "Limpias", "valid heats only": "solo coladas válidas", "leaky inputs left": "variables con fuga", "Grade": "Grado", "target-encoded": "codificado por objetivo", "With Ternium, we combined classical statistics and machine learning on the plant's historical heat data to predict the electricity an electric arc furnace needs per ton of steel, and to find the levers that reduce it.": "Con Ternium combinamos estadística clásica y machine learning sobre datos históricos de coladas de la planta para predecir la electricidad que necesita un horno de arco eléctrico por tonelada de acero, y para encontrar las palancas que la reducen."},F:function(t){var m;
+ if(m=t.match(/^(\d+)% used$/))return m[1]+"% usado";
+ if(m=t.match(/^Step (\d+) of (\d+)$/))return "Paso "+m[1]+" de "+m[2];
+ if(m=t.match(/^Heat ([\d,]+)$/))return "Colada "+m[1];
+ if(m=t.match(/^Actual +(\S+)$/))return "Real      "+m[1];
+ if(m=t.match(/^Predicted +(\S+)$/))return "Predicho  "+m[1];
+ return null;},title:"Predicción de energía en horno de arco · José Rodrigo Ramos García"};
+(function(){var box=document.getElementById("idx"),b=document.getElementById("idx-b"),p=document.getElementById("idx-p");
+  if(!document.getElementById("top"))document.body.id=document.body.id||"top";
+  var items=[["#top","Top"]].concat([].slice.call(document.querySelectorAll(".nav a")).map(function(a){return [a.getAttribute("href"),a.textContent];}));
+  items.forEach(function(x){var a=document.createElement("a");a.href=x[0];a.textContent=x[1];p.appendChild(a);});
+  var links=[].slice.call(p.querySelectorAll("a"));
+  function set(o){box.classList.toggle("open",o);b.setAttribute("aria-expanded",o?"true":"false");}
+  b.addEventListener("click",function(e){e.stopPropagation();set(!box.classList.contains("open"));});
+  links.forEach(function(a){a.addEventListener("click",function(){set(false);});});
+  document.addEventListener("click",function(e){if(!box.contains(e.target))set(false);});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&box.classList.contains("open")){set(false);b.focus();}});
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute("href"));});
+  function spy(){var y=innerHeight*.35,cur=0;secs.forEach(function(s,i){if(s&&i>0&&s.getBoundingClientRect().top<=y)cur=i;});links.forEach(function(a,i){a.classList.toggle("cur",i===cur);});}
+  addEventListener("scroll",spy,{passive:true});spy();})();
+(function(){
+var I=window.__I18N,D=I.D,F=I.F,ATTRS=["aria-label","title","alt"];
+function tr(s){var t=s.trim();if(!t||!/[A-Za-z]/.test(t))return s;var r=Object.prototype.hasOwnProperty.call(D,t)?D[t]:(F?F(t):null);return r==null?s:s.replace(t,r);}
+window.__tr=tr;window.LANG="en";
+function skipT(el){return !el||el.closest("script,style,[data-es],.lng");}
+function doText(n){if(skipT(n.parentElement))return;
+  if(LANG==="es"){if(n.__es!==n.nodeValue){n.__en=n.nodeValue;var v=tr(n.__en);n.__es=v;if(v!==n.nodeValue)n.nodeValue=v;}}
+  else if(n.__en!=null&&n.nodeValue===n.__es){n.__es=null;n.nodeValue=n.__en;}}
+function doEl(el){if(el.closest("script,style"))return;
+  if(el.hasAttribute("data-es")&&el.__l!==LANG){if(el.__h==null)el.__h=el.innerHTML;el.__l=LANG;el.innerHTML=LANG==="es"?el.getAttribute("data-es"):el.__h;}
+  ATTRS.forEach(function(a){var v=el.getAttribute(a);if(v==null)return;el.__a=el.__a||{};var s=el.__a[a]||(el.__a[a]={});
+    if(LANG==="es"){if(v!==s.es){s.en=v;s.es=tr(v);if(s.es!==v)el.setAttribute(a,s.es);}}
+    else if(s.en!=null&&v===s.es){s.es=null;el.setAttribute(a,s.en);}});}
+function walk(r){if(r.nodeType===3){doText(r);return;}if(r.nodeType!==1)return;doEl(r);
+  var w=document.createTreeWalker(r,5),n;while(n=w.nextNode()){if(n.nodeType===3)doText(n);else doEl(n);}}
+new MutationObserver(function(ms){ms.forEach(function(m){if(m.type==="characterData")doText(m.target);else if(m.type==="attributes")doEl(m.target);else m.addedNodes.forEach(walk);});})
+  .observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:ATTRS});
+var P=CanvasRenderingContext2D.prototype,of=P.fillText;
+P.fillText=function(t){var a=[].slice.call(arguments);if(LANG==="es"&&typeof t==="string")a[0]=tr(t);return of.apply(this,a);};
+var tEn=document.title,btn=document.getElementById("lng");
+function setLang(l){window.LANG=l;document.documentElement.lang=l;walk(document.body);
+  btn.setAttribute("aria-label",l==="en"?"Cambiar a español":"Switch to English");
+  document.title=l==="en"?tEn:I.title;
+  try{localStorage.setItem("lang",l)}catch(e){}
+  document.dispatchEvent(new Event("langchange"));}
+btn.addEventListener("click",function(){setLang(window.LANG==="en"?"es":"en")});
+var saved=null;try{saved=localStorage.getItem("lang")}catch(e){}
+if(saved==="es"||(!saved&&(navigator.language||"").toLowerCase().indexOf("es")===0))setLang("es");
+})();
+</script>
+<script>
+(function(){
+  var motion=true;
+  /* Leakage toggle */
+  var lk=document.getElementById("leak");
+  var V={leak:["Looks perfect, predicts nothing","With arc-on time and tons tapped as inputs, the model just rebuilds the formula above. Its score would look almost perfect, but those values only exist after the heat ends, so it cannot help plan one."],
+         honest:["Honest model: R² 0.82 in cross-validation","We excluded the columns that are formulas of energy or are only known at the end of the heat. The model now learns the process itself and can predict before the heat starts."]};
+  function setL(m){var nd=document.getElementById("needle");if(nd){nd.style.transform="rotate("+(m==="leak"?(0.985-0.5)*180:(0.82-0.5)*180)+"deg)";}var gv=document.getElementById("gv");if(gv){gv.textContent=m==="leak"?"≈ 1.0 ?":"R² 0.82";gv.style.color=m==="leak"?"var(--bad)":"var(--ok)";}
+    lk.dataset.mode=m;document.querySelectorAll("#leak .toggle button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.mode===m?"true":"false")});document.getElementById("v-h").textContent=V[m][0];document.getElementById("v-p").textContent=V[m][1];}
+  document.querySelectorAll("#leak .toggle button").forEach(function(b){b.addEventListener("click",function(){setL(b.dataset.mode)})});setL("leak");
+
+  /* Pipeline */
+  var P=[
+    ["Data cleaning","Physical-range filters removed impossible values, out-of-range tap-to-tap times and anomalous energies. Outliers that were real heats were kept and reported, not deleted.","Clean","valid heats only"],
+    ["Leakage control","Columns that are formulas of energy (arc-on time, tap-to-tap, tons tapped) or that exist only at the end of the heat were excluded from the inputs.","0","leaky inputs left"],
+    ["Feature engineering","Built metallurgical interactions, such as hot heel × DRI share, total carbon per ton and lime ratio. Steel grade and shift were target-encoded.","Grade","target-encoded"],
+    ["Incremental Random Forest","Training loop that adds 50 trees per round with warm start, tracks the out-of-bag score and stops early when the train–test gap signals overfitting.","< 0.12","train–test gap"],
+    ["Bayesian tuning","Optuna searched depth, number of trees, minimum samples and features per split, instead of a blind grid search.","60","Optuna trials"],
+    ["Honest evaluation","20% of heats held out for testing, plus 5-fold cross-validation as the honest estimate of performance on future heats.","0.82","R² · 5-fold CV"],
+    ["Quality constraint","A second model predicts tapping temperature, so any low-energy recommendation must also keep steel quality in range.","2","models"],
+    ["Scenario simulation","Simulated operating configurations and searched for the lowest energy that still meets the quality constraint.","10,000","scenarios"]
+  ];
+  var sb=document.querySelectorAll(".st");
+  function show(i){sb.forEach(function(b,j){b.setAttribute("aria-pressed",j===i?"true":"false")});document.getElementById("p-h").textContent=P[i][0];document.getElementById("p-p").textContent=P[i][1];document.getElementById("p-f").textContent=P[i][2];document.getElementById("p-u").textContent=P[i][3];}
+  var playT=null,cur=0;
+  function stopPlay(){if(playT){clearInterval(playT);playT=null;document.getElementById("play").textContent="▶ Play pipeline";document.getElementById("pp-s").textContent="";}}
+  function prog(){var p=document.getElementById("prog");p.classList.remove("run");void p.offsetWidth;if(playT)p.classList.add("run");}
+  function countFig(){var el=document.getElementById("p-f"),txt=el.textContent,mt=txt.match(/[0-9][0-9,.]*/);if(!mt||!motion)return;var raw=mt[0].replace(/,/g,""),end=parseFloat(raw),dec=(raw.split(".")[1]||"").length,t0=null,comma=mt[0].indexOf(",")>-1;
+    function f(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/700),v=(end*(1-Math.pow(1-p,3))).toFixed(dec);if(comma)v=Number(v).toLocaleString("en-US");el.textContent=txt.replace(mt[0],v);if(p<1)requestAnimationFrame(f);else el.textContent=txt;}requestAnimationFrame(f);}
+  var _show=show;show=function(i){cur=i;_show(i);countFig();prog();if(playT)document.getElementById("pp-s").textContent="Step "+(i+1)+" of 8";};
+  sb.forEach(function(b){b.addEventListener("click",function(){stopPlay();show(+b.dataset.i)})});
+  document.getElementById("play").addEventListener("click",function(){if(playT){stopPlay();return;}this.textContent="❚❚ Pause";playT=setInterval(function(){if(cur>=7){stopPlay();return;}show(cur+1)},2600);show(0);});
+  show(0);
+
+  /* Simulation (synthetic) */
+  var cv=document.getElementById("cv"),ctx=cv.getContext("2d"),W=cv.width,H=cv.height,pad={l:58,r:18,t:20,b:46};
+  var seed=7;function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646}
+  function gauss(){var u=rnd()||1e-9,v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+  var pts=[];
+  function gen(){pts=[];for(var i=0;i<10000;i++){var t=Math.max(-65,Math.min(65,gauss()*22));var nz=(rnd()+rnd()+rnd()+rnd()-2)*1.5;var e=100+0.07*t+0.0008*t*t+nz;pts.push([t,e])}}
+  gen();
+  function draw(){
+    var tol=+document.getElementById("tol").value,n=+document.getElementById("n").value;
+    document.getElementById("tol-v").textContent="± "+tol+" °C";document.getElementById("n-v").textContent=n.toLocaleString("en-US");
+    var xs=[-70,70],ys=[93,110];
+    function X(t){return pad.l+(t-xs[0])/(xs[1]-xs[0])*(W-pad.l-pad.r)}
+    function Y(e){return H-pad.b-(e-ys[0])/(ys[1]-ys[0])*(H-pad.t-pad.b)}
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle="rgba(127,211,255,.07)";ctx.fillRect(X(-tol),pad.t,X(tol)-X(-tol),H-pad.t-pad.b);
+    ctx.strokeStyle="rgba(127,211,255,.45)";ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(X(-tol),pad.t);ctx.lineTo(X(-tol),H-pad.b);ctx.moveTo(X(tol),pad.t);ctx.lineTo(X(tol),H-pad.b);ctx.stroke();ctx.setLineDash([]);
+    ctx.strokeStyle="#2e261f";ctx.lineWidth=1;ctx.font="12px Inter, sans-serif";ctx.fillStyle="#8c7e70";
+    [95,100,105].forEach(function(e){ctx.beginPath();ctx.moveTo(pad.l,Y(e));ctx.lineTo(W-pad.r,Y(e));ctx.stroke();ctx.fillText(e,pad.l-34,Y(e)+4)});
+    [-60,-30,0,30,60].forEach(function(t){ctx.fillText((t>0?"+":"")+t,X(t)-12,H-pad.b+18)});
+    ctx.fillStyle="#c4b7a8";ctx.fillText("Predicted tapping temperature vs. target (°C)",pad.l+90,H-8);
+    ctx.save();ctx.translate(14,H/2+70);ctx.rotate(-Math.PI/2);ctx.fillText("Energy index (typical heat = 100)",0,0);ctx.restore();
+    var best=null,feas=0;
+    var lim=Math.min(n,Math.floor(shown));
+    for(var i=0;i<lim;i++){var p=pts[i],ok=Math.abs(p[0])<=tol;if(ok){feas++;if(!best||p[1]<best[1])best=p}
+      ctx.fillStyle=ok?"rgba(127,211,255,.55)":"rgba(90,77,66,.55)";ctx.fillRect(X(p[0])-1.2,Y(p[1])-1.2,2.4,2.4)}
+    if(best){ctx.beginPath();ctx.arc(X(best[0]),Y(best[1]),9,0,Math.PI*2);ctx.fillStyle="rgba(255,122,47,.25)";ctx.fill();ctx.beginPath();ctx.arc(X(best[0]),Y(best[1]),4.5,0,Math.PI*2);ctx.fillStyle="#ff7a2f";ctx.fill();}
+    document.getElementById("o-f").textContent=feas.toLocaleString("en-US");
+    document.getElementById("o-s").textContent=best?(best[1]-100).toFixed(1)+"%":"—";
+  }
+  var shown=10000,anim=null;
+  function animate(){if(!motion){shown=10000;draw();return;}if(anim)cancelAnimationFrame(anim);shown=0;var t0=null;
+    function f(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/1600);shown=10000*p*p;draw();if(p<1)anim=requestAnimationFrame(f);}anim=requestAnimationFrame(f);}
+  ["tol","n"].forEach(function(id){document.getElementById(id).addEventListener("input",function(){shown=10000;draw();})});
+  document.getElementById("resim").addEventListener("click",function(){seed=Math.floor(Math.random()*1e6)+1;gen();animate();});
+  draw();
+
+  /* Count-up KPIs */
+  if(motion){document.querySelectorAll("[data-c]").forEach(function(b){var txt=b.textContent,mt=txt.match(/[0-9.]+/),end=parseFloat(mt[0]),dec=(mt[0].split(".")[1]||"").length,t0=null;
+    function f(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/1500);b.textContent=txt.replace(mt[0],(end*(1-Math.pow(1-p,3))).toFixed(dec));if(p<1)requestAnimationFrame(f);else b.textContent=txt;}requestAnimationFrame(f);});}
+
+  /* Heat cycle */
+  (function(){var st=document.querySelectorAll(".stg"),bar=document.getElementById("mtr"),val=document.getElementById("mtr-v"),share=[8,62,22,8],k=0,acc=0;
+    function step(){st.forEach(function(s,i){s.classList.toggle("on",i===k)});acc=share.slice(0,k+1).reduce(function(a,b){return a+b},0);bar.style.transition=motion?"width 2.2s linear":"none";bar.style.width=acc+"%";val.textContent=acc+"% used";}
+    if(!motion){k=1;step();return;}
+    step();setInterval(function(){k=(k+1)%5;if(k===4){st.forEach(function(s){s.classList.remove("on")});bar.style.transition="none";bar.style.width="0";val.textContent="next heat";k=-1;return;}step();},2400);
+  })();
+
+  /* HMI stream (illustrative) */
+  (function(){var c=document.getElementById("hmi");if(!c||c.offsetParent===null)return;var x=c.getContext("2d"),w=c.width,h=c.height,N=40,A=[],P=[],H=[],a=100,heat=1742,hover=-1;
+    function push(){a+=(rnd()-.5)*3;a=Math.max(94,Math.min(106,a));A.push(a);P.push(a+(rnd()-.5)*2.2);H.push(heat++);}
+    for(var i=0;i<N;i++)push();
+    var pt=10,pb=12;
+    function rng(){var lo=Math.min.apply(null,A.concat(P)),hi=Math.max.apply(null,A.concat(P)),m=(hi-lo)*.12+.3;return [lo-m,hi+m];}
+    function px(i){return 8+i/(N-1)*(w-16)}
+    function setFoot(i){document.getElementById("hh").textContent=H[i].toLocaleString("en-US");document.getElementById("he").textContent=(Math.abs(P[i]-A[i])/A[i]*100).toFixed(1)+"%";}
+    function paint(){var r=rng();function py(v){return pt+(1-(v-r[0])/(r[1]-r[0]))*(h-pt-pb)}
+      x.clearRect(0,0,w,h);x.strokeStyle="rgba(127,211,255,.12)";x.lineWidth=1;for(var g=1;g<4;g++){x.beginPath();x.moveTo(0,g*h/4);x.lineTo(w,g*h/4);x.stroke();}
+      [[A,"#ff7a2f",8],[P,"#7fd3ff",10]].forEach(function(s){x.beginPath();s[0].forEach(function(v,i){i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v))});x.strokeStyle=s[1];x.lineWidth=3;x.shadowColor=s[1];x.shadowBlur=s[2];x.stroke();x.shadowBlur=0;});
+      if(hover>=0){var X=px(hover);x.strokeStyle="rgba(244,236,226,.45)";x.setLineDash([4,4]);x.beginPath();x.moveTo(X,0);x.lineTo(X,h);x.stroke();x.setLineDash([]);
+        [[A,"#ff7a2f"],[P,"#7fd3ff"]].forEach(function(s){x.beginPath();x.arc(X,py(s[0][hover]),6,0,Math.PI*2);x.fillStyle=s[1];x.fill();x.strokeStyle="#0a0806";x.lineWidth=2;x.stroke();});
+        var lines=["Heat "+H[hover].toLocaleString("en-US"),"Actual    "+A[hover].toFixed(1),"Predicted "+P[hover].toFixed(1),"Error     "+(Math.abs(P[hover]-A[hover])/A[hover]*100).toFixed(1)+"%"];
+        x.font="20px Inter, sans-serif";var bw=250,bh=112,bx=X+16+bw>w?X-16-bw:X+16,by=8;
+        x.fillStyle="rgba(10,8,6,.9)";x.strokeStyle="rgba(127,211,255,.45)";x.lineWidth=1.5;x.beginPath();x.rect(bx,by,bw,bh);x.fill();x.stroke();
+        lines.forEach(function(l,k){x.fillStyle=k===0?"#f4ece2":k===1?"#ff7a2f":k===2?"#7fd3ff":"#62d69a";x.fillText(l,bx+14,by+28+k*25)});}
+      }
+    paint();setFoot(N-1);
+    c.style.cursor="crosshair";
+    c.addEventListener("mousemove",function(e){var b=c.getBoundingClientRect(),fx=(e.clientX-b.left)/b.width*w;hover=Math.max(0,Math.min(N-1,Math.round((fx-8)/(w-16)*(N-1))));setFoot(hover);paint();});
+    c.addEventListener("mouseleave",function(){hover=-1;setFoot(N-1);paint();});
+    var hint=document.getElementById("hmi-hint");
+    if(!motion)return;
+    setInterval(function(){if(hover>=0)return;push();A.shift();P.shift();H.shift();setFoot(N-1);paint();},900);
+  })();
+
+  /* Parity + training charts (illustrative) */
+  function parity(prog){var c=document.getElementById("par"),x=c.getContext("2d"),w=c.width,h=c.height,L=50,B=40,lo=94,hi=106;
+    function X(v){return L+(v-lo)/(hi-lo)*(w-L-14)}function Y(v){return h-B-(v-lo)/(hi-lo)*(h-B-14)}
+    x.clearRect(0,0,w,h);x.font="12px Inter, sans-serif";x.fillStyle="#8c7e70";x.strokeStyle="#2e261f";
+    [96,100,104].forEach(function(v){x.beginPath();x.moveTo(L,Y(v));x.lineTo(w-14,Y(v));x.stroke();x.fillText(v,L-32,Y(v)+4);x.fillText(v,X(v)-10,h-B+18)});
+    x.fillStyle="#c4b7a8";x.fillText("Actual (index)",w/2-40,h-6);x.save();x.translate(14,h/2+44);x.rotate(-Math.PI/2);x.fillText("Predicted (index)",0,0);x.restore();
+    x.fillStyle="rgba(127,211,255,.08)";x.beginPath();x.moveTo(X(lo),Y(lo*1.01));x.lineTo(X(hi),Y(hi*1.01));x.lineTo(X(hi),Y(hi*.99));x.lineTo(X(lo),Y(lo*.99));x.closePath();x.fill();
+    x.strokeStyle="rgba(244,236,226,.5)";x.setLineDash([6,5]);x.beginPath();x.moveTo(X(lo),Y(lo));x.lineTo(X(hi),Y(hi));x.stroke();x.setLineDash([]);
+    var s2=11;function r2(){s2=(s2*16807)%2147483647;return (s2-1)/2147483646}
+    var n=Math.floor(400*prog);for(var i=0;i<400;i++){var u=r2(),v=r2(),g=Math.sqrt(-2*Math.log(u||1e-9))*Math.cos(2*Math.PI*v),a=100+g*2.2,e=(r2()+r2()+r2()-1.5)*1.1,p=a+e;if(i>=n)continue;
+      x.fillStyle=Math.abs(e)/a>.01?"rgba(255,122,47,.75)":"rgba(127,211,255,.6)";x.beginPath();x.arc(X(a),Y(p),2.6,0,Math.PI*2);x.fill();}}
+  function training(prog){var c=document.getElementById("trn"),x=c.getContext("2d"),w=c.width,h=c.height,L=50,B=40,R=10,stop=7;
+    function X(i){return L+i/10*(w-L-14)}function Y(v){return h-B-(v-.5)/.5*(h-B-14)}
+    x.clearRect(0,0,w,h);x.font="12px Inter, sans-serif";x.fillStyle="#8c7e70";x.strokeStyle="#2e261f";
+    [.6,.8,1].forEach(function(v){x.beginPath();x.moveTo(L,Y(v));x.lineTo(w-14,Y(v));x.stroke();x.fillText(v.toFixed(1),L-32,Y(v)+4)});
+    for(var i=0;i<=R;i+=2)x.fillText(i*50,X(i)-10,h-B+18);
+    x.fillStyle="#c4b7a8";x.fillText("Trees",w/2-20,h-6);x.save();x.translate(14,h/2+12);x.rotate(-Math.PI/2);x.fillText("R²",0,0);x.restore();
+    var tr=[],te=[];for(var i=0;i<=R;i++){tr.push(.6+.355*(1-Math.exp(-i/1.6)));te.push(.58+.25*(1-Math.exp(-i/1.9))-(i>stop?(i-stop)*.004:0));}
+    var upto=Math.min(R,prog*R);
+    function ln(arr,col){x.beginPath();for(var i=0;i<=upto;i++){var py=Y(arr[i]);i?x.lineTo(X(i),py):x.moveTo(X(i),py)}x.strokeStyle=col;x.lineWidth=3;x.stroke();}
+    ln(tr,"#c4b7a8");ln(te,"#7fd3ff");
+    if(upto>=stop){x.strokeStyle="rgba(255,122,47,.8)";x.setLineDash([5,5]);x.beginPath();x.moveTo(X(stop),Y(.5));x.lineTo(X(stop),14);x.stroke();x.setLineDash([]);
+      x.fillStyle="#ff7a2f";x.fillText("early stop",X(stop)+6,30);
+      x.strokeStyle="#ff7a2f";x.lineWidth=2;x.beginPath();x.moveTo(X(stop)+18,Y(tr[stop]));x.lineTo(X(stop)+18,Y(te[stop]));x.stroke();x.fillText("gap < 0.12",X(stop)+24,(Y(tr[stop])+Y(te[stop]))/2+4);}
+    x.fillStyle="#c4b7a8";x.fillText("— train",w-150,h-B-30);x.fillStyle="#7fd3ff";x.fillText("— test",w-150,h-B-12);}
+  function playChart(fn){if(!motion){fn(1);return;}var t0=null;function f(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/1600);fn(p);if(p<1)requestAnimationFrame(f);}requestAnimationFrame(f);}
+  parity(1);training(1);
+
+  /* SPC live chart (illustrative) */
+  (function(){var c=document.getElementById("spc"),x=c.getContext("2d"),w=c.width,h=c.height,L=44,N=60,D=[],cl=100,ucl=104,lcl=96,s3=5;
+    function r3(){s3=(s3*16807)%2147483647;return (s3-1)/2147483646}
+    function nx(){var g=(r3()+r3()+r3()+r3()-2)*2.2;if(r3()<.04)g+=(r3()<.5?-1:1)*4.8;return cl+g;}
+    for(var i=0;i<N;i++)D.push(nx());
+    function Y(v){return h-24-(v-92)/16*(h-40)}
+    function paint(){x.clearRect(0,0,w,h);x.font="12px Inter, sans-serif";
+      [[cl,"#c4b7a8","CL"],[ucl,"#ff6b5e","UCL"],[lcl,"#ff6b5e","LCL"]].forEach(function(l){x.strokeStyle=l[1];x.globalAlpha=.7;x.setLineDash(l[2]==="CL"?[]:[7,6]);x.beginPath();x.moveTo(L,Y(l[0]));x.lineTo(w-6,Y(l[0]));x.stroke();x.setLineDash([]);x.globalAlpha=1;x.fillStyle=l[1];x.fillText(l[2],4,Y(l[0])+4)});
+      x.beginPath();D.forEach(function(v,i){var px=L+i/(N-1)*(w-L-10);i?x.lineTo(px,Y(v)):x.moveTo(px,Y(v))});x.strokeStyle="rgba(127,211,255,.5)";x.lineWidth=1.5;x.stroke();
+      D.forEach(function(v,i){var px=L+i/(N-1)*(w-L-10),out=v>ucl||v<lcl;x.beginPath();x.arc(px,Y(v),out?5:3,0,Math.PI*2);x.fillStyle=out?"#ff6b5e":"#7fd3ff";x.fill();
+        if(out){x.strokeStyle="rgba(255,107,94,.5)";x.lineWidth=1;x.beginPath();x.arc(px,Y(v),11,0,Math.PI*2);x.stroke();if(i>N-12){x.fillStyle="#ff6b5e";x.fillText("review heat",Math.min(px-40,w-100),Y(v)+(v>ucl?-16:24));}}});}
+    paint();if(!motion)return;
+    var vis=false;if("IntersectionObserver" in window){new IntersectionObserver(function(es){vis=es[0].isIntersecting}).observe(c);}else vis=true;
+    setInterval(function(){if(!vis)return;D.push(nx());D.shift();paint();},700);
+  })();
+
+  /* Reveal on scroll */
+  if(motion&&"IntersectionObserver" in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var el=e.target;io.unobserve(el);
+      if(el.id==="par")playChart(parity);else if(el.id==="trn")playChart(training);else if(el.id==="cv")animate();else if(el.classList.contains("cmp"))el.classList.add("go");else el.classList.add("rv");})},{threshold:.2});
+    document.querySelectorAll("main .panel, main .ph, main .rk, main .mt, main .imp .panel, main .ctl div, main .fb, main .chart, main .cycle, #par, #trn, #cv, .cmp").forEach(function(el){if(el.getBoundingClientRect().top>window.innerHeight)io.observe(el);});
+  }
+  ["langchange","themechange"].forEach(function(ev){document.addEventListener(ev,function(){draw();parity(1);training(1);});});
+})();
+</script>
+</body>
+</html>
