@@ -1,0 +1,1177 @@
+<!doctype html>
+<html lang="en">
+<head><script>/* perf: cap JS animations at ~30 fps */(function(){var R=window.requestAnimationFrame,C=window.cancelAnimationFrame;if(!R||window.__fpsCap)return;window.__fpsCap=1;var Q={},n=0,last=0,on=false;function tick(t){on=false;if(t-last<31){on=true;R(tick);return;}last=t;var q=Q;Q={};for(var k in q)if(q.hasOwnProperty(k)){try{q[k](t);}catch(e){setTimeout(function(){throw e;});}}}window.requestAnimationFrame=function(cb){n++;Q[n]=cb;if(!on){on=true;R(tick);}return n;};window.cancelAnimationFrame=function(id){delete Q[id];};})();</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Closed-Loop Training &amp; Audit System · José Rodrigo Ramos García</title>
+<meta name="description" content="Industry project for Traffic Light: a skills matrix, a 50+ page training manual and evaluation checklists that close the loop between field audits and technician training.">
+<meta property="og:title" content="Closed-Loop Training & Audit System">
+<meta property="og:description" content="Industrial & Systems Engineering project with Traffic Light · Tecnológico de Monterrey · 2026">
+<meta name="theme-color" content="#070a12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><script>(function(){var t=null;try{t=localStorage.getItem("theme")}catch(e){}if(t!=="light"&&t!=="dark")t="dark";document.documentElement.setAttribute("data-theme",t);})();</script>
+<style>
+/* Layout: a street at night. Hero is a lit avenue; sections sit on the dark road like signage panels, with sodium-amber light as the single accent. Single dark theme by design. */
+:root{
+  --night:#070a12; --night-2:#0b1020; --panel:#10172a; --panel-2:#161f36; --line:#232e48;
+  --fg:#f3eee4; --fg-2:#b8bfce; --fg-3:#7e89a3;
+  --amber:#ffb547; --amber-hi:#ffd88a; --amber-bg:rgba(255,181,71,.09); --amber-line:rgba(255,181,71,.45);
+  --led:#9cc3ff; --led-bg:rgba(156,195,255,.08);
+  --red:#ff6f6f; --red-bg:rgba(255,111,111,.12);
+  --yel:#ffc145; --yel-bg:rgba(255,193,69,.13);
+  --grn:#4fd89b; --grn-bg:rgba(79,216,155,.12);
+  --display:"Overpass","Highway Gothic",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Overpass Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth;background:var(--night)}
+body{margin:0;background:var(--night);color:var(--fg);font-family:var(--display);font-size:16.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.1}
+p{margin:0}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+.lbl{font-family:var(--mono);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+.muted{color:var(--fg-2)}
+.small{font-size:14.5px}
+.note{font-family:var(--mono);font-size:13px;color:var(--fg-3);margin-top:10px}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;min-height:560px;display:flex;align-items:flex-end;padding-block:120px 44px;isolation:isolate}
+.hero .scene{position:absolute;inset:0;width:100%;height:100%;z-index:-2}
+.sl{opacity:.08}.sg{opacity:1}
+.gt i{transform-origin:left center}
+.cyc{font-family:var(--mono);font-size:13.5px;color:var(--amber);min-height:1.4em}
+.hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(7,10,18,.92) 0%,rgba(7,10,18,.7) 38%,rgba(7,10,18,0) 70%),linear-gradient(0deg,var(--night) 0%,rgba(7,10,18,0) 30%)}
+.hero .wrap{width:100%}
+.hero h1{font-size:clamp(38px,6.2vw,70px);font-weight:800;letter-spacing:-.01em;margin:14px 0 16px;max-width:13ch}
+.hero h1 em{font-style:normal;color:var(--amber);text-shadow:0 0 28px rgba(255,181,71,.45)}
+.hero .sub{font-size:clamp(16.5px,2vw,20px);color:var(--fg-2);max-width:54ch}
+.hero .meta{display:flex;flex-wrap:wrap;gap:6px 20px;font-family:var(--mono);font-size:13px;color:var(--fg-3);margin-top:18px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:40px}
+.kpis div{background:rgba(16,23,42,.72);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpis b{display:block;font-size:clamp(24px,3.2vw,34px);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+.kpis span{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3)}
+.kpis .lit{border-color:var(--amber-line);background:rgba(255,181,71,.08)}
+.kpis .lit b{color:var(--amber);text-shadow:0 0 18px rgba(255,181,71,.4)}
+@media all{
+  .glow{animation:hum 5s ease-in-out infinite}
+  .glow.g1{animation-delay:-1.7s}.glow.g2{animation-delay:-3.3s}
+  @keyframes hum{0%,100%{opacity:1}50%{opacity:.82}}
+  .lit{animation:on 1.1s ease-out both}
+  @keyframes on{0%{opacity:0}35%{opacity:.85}45%{opacity:.25}60%{opacity:1}100%{opacity:1}}
+  .car{opacity:0}
+  .sg{animation:sigG 10s linear infinite}.sa{animation:sigA 10s linear infinite}.sr{animation:sigR 10s linear infinite}
+  @keyframes sigG{0%,44%{opacity:1}45%,100%{opacity:.08}}
+  @keyframes sigA{0%,44%{opacity:.08}45%,54%{opacity:1}55%,100%{opacity:.08}}
+  @keyframes sigR{0%,54%{opacity:.08}55%,99.5%{opacity:1}100%{opacity:.08}}
+  .road:before{animation:drive 1.4s linear infinite}
+  @keyframes drive{to{background-position:44px 0}}
+  .stop:before{animation:beacon 4s ease-in-out infinite}
+  .stop:nth-child(2):before{animation-delay:1s}.stop:nth-child(3):before{animation-delay:2s}.stop:nth-child(4):before{animation-delay:3s}
+  @keyframes beacon{0%,30%,100%{box-shadow:0 0 0 5px var(--night),0 0 22px 4px rgba(255,181,71,.55)}15%{box-shadow:0 0 0 5px var(--night),0 0 0 12px rgba(255,181,71,.25),0 0 34px 10px rgba(255,181,71,.8)}}
+  .orbit{transform-origin:210px 200px;animation:spin 6s linear infinite}
+  .bad .orbit{animation-duration:11s}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .rv{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes rise{from{transform:translateY(16px);opacity:.25}}
+  .gantt.go .gt i{animation:grow .9s cubic-bezier(.2,.7,.2,1) both}
+  .gantt.go .gr:nth-child(2) .gt i{animation-delay:.15s}.gantt.go .gr:nth-child(3) .gt i{animation-delay:.3s}.gantt.go .gr:nth-child(4) .gt i{animation-delay:.45s}.gantt.go .gr:nth-child(5) .gt i{animation-delay:.6s}
+  @keyframes grow{from{transform:scaleX(0)}}
+  .cell.flash{animation:flash .9s ease-out}
+  @keyframes flash{0%{transform:scale(1.35);box-shadow:0 0 0 3px var(--amber),0 0 18px var(--amber)}100%{transform:scale(1)}}
+  .lamps i{transition:background .4s,box-shadow .4s}
+  .c-in{animation:carIn 7s cubic-bezier(.55,0,.9,.6) 2.2s infinite}
+  .c-out{animation:carOut 9s cubic-bezier(.1,.4,.45,1) 4.5s infinite}
+  @keyframes carIn{0%{transform:translate(646px,332px) scale(.03);opacity:0}8%{opacity:1}92%{opacity:1}100%{transform:translate(1010px,650px) scale(1.6);opacity:0}}
+  @keyframes carOut{0%{transform:translate(800px,650px) scale(1.5);opacity:0}6%{opacity:1}85%{opacity:.9}100%{transform:translate(648px,334px) scale(.03);opacity:0}}
+}
+
+/* Nav */
+.back-home{position:fixed;z-index:60;top:calc(14px + env(safe-area-inset-top,0px));left:calc(14px + env(safe-area-inset-left,0px));display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(7,10,18,.82);backdrop-filter:blur(8px);border:1px solid #ffb547;color:#ffb547;font-family:var(--mono);font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 6px 24px rgba(0,0,0,.45);transition:transform .2s,background .2s}
+.back-home:hover,.back-home:focus-visible{transform:translateX(-3px);background:#ffb547;color:#140c04;outline:none}
+@media (min-width:761px){.nav .wrap{padding-left:max(18px,calc(150px - (100vw - 1100px) / 2))}}
+
+
+.nav{position:sticky;top:0;z-index:20;background:rgba(7,10,18,.88);backdrop-filter:blur(10px);border-block:1px solid var(--line)}
+.nav .wrap{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-block:9px}
+.nav .wrap::-webkit-scrollbar{display:none}
+.nav a{flex:none;font-family:var(--mono);font-size:13.5px;color:var(--fg-2);text-decoration:none;padding:5px 10px;border-radius:6px}
+.nav a:hover,.nav a:focus-visible{background:var(--amber-bg);color:var(--amber);outline:none}
+
+/* Sections */
+main section{padding-block:72px;border-bottom:1px solid var(--line);scroll-margin-top:50px}
+main section:last-child{border-bottom:none}
+.sh{display:grid;gap:12px;margin-bottom:30px}
+.sh h2{font-size:clamp(28px,3.6vw,40px);font-weight:800;letter-spacing:-.01em}
+.sh p{color:var(--fg-2);max-width:66ch;font-size:17.5px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;min-width:0}
+.panel h3{font-size:18px;font-weight:600;margin-bottom:10px}
+.panel ul{margin:0;padding-left:18px;color:var(--fg-2)}
+.panel li{margin:5px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:13.5px;padding:4px 10px;border-radius:999px;background:var(--panel-2);color:var(--fg-2);border:1px solid var(--line)}
+.quote{font-size:clamp(20px,2.6vw,26px);line-height:1.35;font-weight:600;max-width:34ch;margin:6px 0 30px}
+.quote b{color:var(--amber);font-weight:600}
+
+/* Timeline as a road */
+.road{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;padding-top:34px}
+.road:before{content:"";position:absolute;left:0;right:0;top:10px;height:4px;background:repeating-linear-gradient(90deg,var(--amber) 0 26px,transparent 26px 44px);opacity:.75;border-radius:2px}
+.stop{position:relative;min-width:0}
+.stop:before{content:"";position:absolute;top:-30px;left:0;width:16px;height:16px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 5px var(--night),0 0 22px 4px rgba(255,181,71,.55)}
+.stop .when{font-family:var(--mono);font-size:13.5px;color:var(--amber)}
+.stop h3{font-size:18px;font-weight:600;margin:4px 0 6px}
+.stop p{font-size:14.5px;color:var(--fg-2)}
+
+/* Rich picture loops */
+.loops{display:grid;grid-template-columns:minmax(0,1fr) 170px minmax(0,1fr);gap:16px;align-items:center}
+.loopcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 14px 18px;min-width:0;transition:opacity .3s,border-color .3s}
+.loopcard h3{font-size:17px;font-weight:600;text-align:center;margin:6px 0 2px}
+.loopcard p{font-size:13.5px;color:var(--fg-3);text-align:center}
+.loopcard svg{width:100%;height:auto;display:block}
+.loopcard.bad{--c:var(--red)}
+.loopcard.good{--c:var(--grn);border-color:rgba(79,216,155,.35)}
+.lp-ring{fill:none;stroke:var(--c);stroke-width:2.5;stroke-opacity:.55}
+.lp-arrow{fill:var(--c)}
+.lp-node rect{fill:var(--panel-2);stroke:var(--c);stroke-opacity:.6;stroke-width:1.5}
+.lp-node text{font-family:var(--display);font-size:15px;fill:var(--fg);font-weight:600}
+.lp-mid{font-family:var(--mono);font-size:12.5px;fill:var(--c);letter-spacing:.12em}
+@media all{.good .lp-ring{stroke-dasharray:10 8;animation:flow 3s linear infinite}@keyframes flow{to{stroke-dashoffset:-36}}}
+.core{text-align:center;display:grid;gap:10px;justify-items:center}
+.core .bulb{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle,rgba(255,216,138,.35),rgba(255,181,71,.08) 60%,transparent 70%);font-weight:800;font-size:14.5px;line-height:1.2;color:var(--amber-hi);padding:10px}
+.core small{font-family:var(--mono);font-size:12.5px;color:var(--fg-3);line-height:1.5}
+.ctx{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+.ctx span{font-family:var(--mono);font-size:13px;color:var(--fg-2);border:1px dashed var(--line);border-radius:8px;padding:4px 10px}
+.toggle{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:16px;flex-wrap:wrap}
+.toggle button{font:inherit;font-family:var(--mono);font-size:13.5px;color:var(--fg-2);background:none;border:0;border-radius:7px;padding:6px 12px;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--amber);color:#1b1206}
+.toggle button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.loops[data-show="bad"] .good,.loops[data-show="good"] .bad{opacity:.28}
+
+/* Relations */
+.rel{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start;margin-top:34px}
+.rel svg{width:100%;height:auto;display:block}
+.rel .t{font-family:var(--display);font-size:13px;fill:var(--fg);font-weight:600}
+.rel .io{font-family:var(--mono);font-size:10.5px;fill:var(--fg-3)}
+.rel .nd{fill:var(--panel-2);stroke:var(--line);stroke-width:1.5}
+.rel .nd.root{fill:rgba(255,181,71,.12);stroke:var(--amber)}
+.rel .nd.out{fill:var(--led-bg);stroke:var(--led)}
+.rel .ar{stroke:var(--fg-3);stroke-width:1.5;fill:none}
+
+/* Alternatives */
+.alt .k{font-family:var(--mono);font-size:13px;letter-spacing:.14em;color:var(--fg-3)}
+.alt h3{font-size:20px;margin:6px 0 8px}
+.alt .v{font-family:var(--mono);font-size:13.5px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);color:var(--fg-3)}
+.alt.pick{border-color:var(--amber-line);background:linear-gradient(180deg,rgba(255,181,71,.1),var(--panel) 70%);position:relative}
+.alt.pick .v{color:var(--amber)}
+.alt.pick .badge{position:absolute;top:-12px;right:16px;background:var(--amber);color:#1b1206;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;padding:3px 9px;border-radius:6px}
+
+/* Loop steps */
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:40px}
+.step{all:unset;box-sizing:border-box;cursor:pointer;display:block;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0;transition:border-color .2s,background .2s}
+.step:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.step[aria-pressed="true"]{border-color:var(--amber-line);background:var(--amber-bg)}
+.step .k{font-family:var(--mono);font-size:13px;letter-spacing:.12em;color:var(--amber)}
+.step .t{display:block;font-size:18px;font-weight:600;margin-top:4px}
+.step .q{display:block;font-size:14px;color:var(--fg-3);margin-top:2px}
+.detail{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:12px;padding:16px 20px;min-height:92px}
+.detail h3{font-size:17px;margin-bottom:4px}
+.detail p{color:var(--fg-2);max-width:74ch}
+
+/* Matrix */
+.mx-top{display:grid;grid-template-columns:auto repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.signal{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 18px}
+.lamps{display:grid;gap:6px;background:#05070c;border:1px solid var(--line);border-radius:10px;padding:7px}
+.lamps i{width:20px;height:20px;border-radius:50%;background:#1a2133;display:block;transition:background .3s,box-shadow .3s}
+.lamps i.on.r{background:var(--red);box-shadow:0 0 14px 2px var(--red)}
+.lamps i.on.y{background:var(--yel);box-shadow:0 0 14px 2px var(--yel)}
+.lamps i.on.g{background:var(--grn);box-shadow:0 0 14px 2px var(--grn)}
+.signal b{display:block;font-size:19px;font-weight:800}
+.signal span{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3)}
+.ind{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 18px;display:grid;align-content:center}
+.ind b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.ind span{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3)}
+.mx-tools{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:14px;color:var(--fg-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none}
+.d1{background:var(--red)}.d2{background:var(--yel)}.d3{background:var(--grn)}
+.btn{font:inherit;font-family:var(--mono);font-size:13.5px;padding:7px 13px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+.btn:hover{border-color:var(--amber-line);color:var(--amber)}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+#mx{border-collapse:collapse;width:100%;min-width:1180px;font-variant-numeric:tabular-nums}
+#mx th,#mx td{padding:0;border-bottom:1px solid var(--line);text-align:center}
+#mx thead tr.grp th{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);padding:9px 4px 5px;border-bottom:1px solid var(--amber-line)}
+#mx thead tr.cmp th{font-size:11px;font-weight:400;color:var(--fg-2);padding:6px 3px 8px;vertical-align:bottom;line-height:1.2;min-width:52px}
+#mx tbody th{font-family:var(--mono);font-size:12.5px;font-weight:600;text-align:left;padding:6px 10px;white-space:nowrap;position:sticky;left:0;background:var(--panel);z-index:1}
+#mx tbody th small{display:block;font-size:10.5px;color:var(--fg-3);font-weight:400}
+#mx tbody tr:last-child th,#mx tbody tr:last-child td{border-bottom:none}
+.cell{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:calc(100% - 6px);margin:3px;height:30px;border-radius:7px;font-family:var(--mono);font-size:12.5px;font-weight:600;line-height:31px;text-align:center;transition:transform .12s}
+.cell:hover{transform:scale(1.07)}
+.cell:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.l1{background:var(--red-bg);color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+.l2{background:var(--yel-bg);color:var(--yel);box-shadow:inset 0 0 0 1px rgba(255,193,69,.7)}
+.l3{background:var(--grn-bg);color:var(--grn);box-shadow:inset 0 0 0 1px rgba(79,216,155,.7)}
+td.stat{font-family:var(--mono);font-size:11.5px;text-align:left;padding:0 10px;white-space:nowrap}
+.sp{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px}
+.sp.s1{background:var(--red-bg);color:var(--red)}.sp.s2{background:var(--yel-bg);color:var(--yel)}.sp.s3{background:var(--grn-bg);color:var(--grn)}
+.prio{margin-top:18px;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr) 28px;gap:10px;align-items:center;font-size:13.5px}
+.bar .nm{color:var(--fg-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .tr{height:10px;border-radius:5px;background:var(--panel-2);overflow:hidden}
+.bar .fl{display:block;height:100%;border-radius:5px;background:var(--red);box-shadow:0 0 10px rgba(255,111,111,.5);transition:width .3s}
+.bar .v{font-family:var(--mono);font-size:13px;text-align:right}
+.plan{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.plan li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;color:var(--fg-2)}
+.plan .dot{margin-top:7px}
+.plan b{color:var(--fg);font-weight:600}
+.levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}
+.lv{border-radius:14px;padding:16px 18px;border:1px solid}
+.lv.a{border-color:rgba(255,111,111,.5);background:var(--red-bg)}.lv.b{border-color:rgba(255,193,69,.5);background:var(--yel-bg)}.lv.c{border-color:rgba(79,216,155,.5);background:var(--grn-bg)}
+.lv h3{font-size:16.5px;margin-bottom:4px}
+.lv p{font-size:14px;color:var(--fg-2)}
+.lv .act{margin-top:8px;font-family:var(--mono);font-size:13px;color:var(--fg)}
+
+/* Manual */
+.method{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+.ms{padding:18px 16px;border-right:1px solid var(--line);min-width:0}
+.ms:last-child{border-right:none}
+.ms .k{font-family:var(--mono);font-size:30px;font-weight:600;color:var(--amber);line-height:1}
+.ms h3{font-size:16.5px;margin:10px 0 4px}
+.ms p{font-size:13.5px;color:var(--fg-2)}
+.mods{display:grid;gap:10px;margin-top:16px}
+.mod{all:unset;box-sizing:border-box;display:grid;grid-template-columns:48px minmax(0,1fr) minmax(0,2fr) 64px;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 18px;cursor:pointer}
+.mod:hover{border-color:var(--amber-line)}
+.mod:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.mod .n{font-family:var(--mono);font-weight:600;font-size:17px;color:var(--amber)}
+.mod .nm{font-weight:600;font-size:16px}
+.mod .hb{height:8px;border-radius:4px;background:var(--panel-2);overflow:hidden}
+.mod .hb i{display:block;height:100%;background:linear-gradient(90deg,rgba(255,181,71,.5),var(--amber));border-radius:4px}
+.mod .h{font-family:var(--mono);font-size:13px;text-align:right}
+.units{grid-column:1/-1;display:none;border-top:1px dashed var(--line);padding-top:10px}
+.mod[aria-expanded="true"]{border-color:var(--amber-line)}
+.mod[aria-expanded="true"] .units{display:block}
+.units table{width:100%;border-collapse:collapse;font-size:14px}
+.units td{padding:5px 8px;border-bottom:1px solid var(--line);color:var(--fg-2)}
+.units tr:last-child td{border-bottom:none}
+.units td:first-child{font-family:var(--mono);color:var(--fg-3);width:48px}
+.units td:last-child{font-family:var(--mono);text-align:right;width:70px;color:var(--fg)}
+
+/* Gantt */
+.gantt{display:grid;gap:8px}
+.gr{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:14px;align-items:center}
+.gr .nm b{display:block;font-size:15.5px;font-weight:600}
+.gr .nm span{font-family:var(--mono);font-size:12.5px;color:var(--fg-3)}
+.gt{position:relative;height:30px;border-radius:6px;background:repeating-linear-gradient(90deg,var(--panel) 0 calc(5% - 1px),var(--line) calc(5% - 1px) 5%)}
+.gt i{position:absolute;top:5px;bottom:5px;border-radius:5px;background:rgba(156,195,255,.75);display:flex;align-items:center;padding-left:8px;font-family:var(--mono);font-size:11px;color:#0b1020;white-space:nowrap;overflow:hidden}
+.gt i.pilot{background:var(--amber);box-shadow:0 0 16px rgba(255,181,71,.45)}
+.gaxis{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:14px;font-family:var(--mono);font-size:11px;color:var(--fg-3)}
+.gaxis div:last-child{display:flex;justify-content:space-between}
+.kg h3{display:flex;align-items:center;gap:9px}
+.kg ol{margin:6px 0 0;padding-left:20px;color:var(--fg-2)}
+.kg li{margin:6px 0}
+.kg li b{color:var(--fg);font-weight:600}
+.risks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin-top:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+.risks div{padding:16px 18px;border-right:1px solid var(--line)}
+.risks div:last-child{border-right:none}
+.risks b{display:block;font-weight:600;margin-bottom:4px}
+.risks p{font-size:14px;color:var(--fg-2)}
+
+/* Impact */
+.calc{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+.crow{display:grid;gap:6px;padding:14px 0;border-bottom:1px solid var(--line)}
+.crow:first-child{padding-top:0}
+.crow:last-of-type{border-bottom:none}
+.crow .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.crow .top b{font-size:16.5px;font-weight:600}
+.crow .top output{font-family:var(--mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.crow .f{font-family:var(--mono);font-size:13px;color:var(--fg-3)}
+.crow label{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--fg-2)}
+.crow input[type=range]{flex:1;accent-color:var(--amber)}
+.crow .pct{font-family:var(--mono);width:44px;text-align:right;color:var(--fg)}
+.total{border:1px solid var(--amber-line);border-radius:14px;padding:22px;background:radial-gradient(120% 90% at 0% 0%,rgba(255,181,71,.16),var(--panel) 60%)}
+.total b{display:block;font-size:clamp(32px,4.2vw,44px);font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--amber);text-shadow:0 0 24px rgba(255,181,71,.35)}
+.total span{font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3)}
+.total .split{display:grid;gap:8px;margin-top:16px}
+.total .split div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;font-size:14px;color:var(--fg-2)}
+.total .split em{font-style:normal;font-family:var(--mono);color:var(--fg)}
+.stack{display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:14px;background:var(--panel-2)}
+.stack i{display:block;height:100%}
+
+/* Closing */
+.closing{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.rec{border:1px solid var(--amber-line);border-radius:14px;padding:26px;background:radial-gradient(100% 120% at 100% 0%,rgba(255,181,71,.18),var(--panel) 65%)}
+.rec p{font-size:clamp(19px,2.2vw,23px);font-weight:600;line-height:1.4;margin-top:10px}
+footer{border-top:1px solid var(--line);font-family:var(--mono);font-size:13px;color:var(--fg-3)}
+footer .wrap{padding-block:26px calc(28px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between}
+
+@media (max-width:900px){
+  .loops{grid-template-columns:minmax(0,1fr)}
+  .core{order:-1}
+  .method{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ms{border-bottom:1px solid var(--line)}
+  .ms:nth-child(2n){border-right:none}
+  .risks{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .risks div:nth-child(2n){border-right:none}
+  .risks div:nth-child(-n+2){border-bottom:1px solid var(--line)}
+}
+@media (max-width:760px){
+  .hero{min-height:0;padding-top:300px}
+  .hero .scene{height:360px;bottom:auto}
+  .hero:after{background:linear-gradient(180deg,rgba(7,10,18,0) 0,rgba(7,10,18,0) 200px,var(--night) 350px)}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2,.grid3,.rel,.prio,.calc,.closing,.levels,.steps{grid-template-columns:minmax(0,1fr)}
+  .mx-top{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .signal{grid-column:1/-1}
+  .road{grid-template-columns:minmax(0,1fr);padding:0 0 0 34px;gap:22px}
+  .road:before{left:6px;right:auto;top:0;bottom:0;width:4px;height:auto;background:repeating-linear-gradient(180deg,var(--amber) 0 22px,transparent 22px 36px)}
+  .stop:before{top:4px;left:-34px}
+  .mod{grid-template-columns:40px minmax(0,1fr) 56px}
+  .mod .hb{display:none}
+  .gr,.gaxis{grid-template-columns:minmax(0,1fr)}
+  .gaxis div:first-child{display:none}
+  .bar{grid-template-columns:minmax(0,130px) minmax(0,1fr) 24px}
+}
+@media (prefers-reduced-motion:reduce) and (max-width:1px){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+.tr{position:fixed;z-index:60;top:calc(14px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));display:flex;align-items:center;gap:10px}
+.lng{position:relative;display:inline-flex;padding:3px;border-radius:999px;background:rgba(7,10,18,.82);backdrop-filter:blur(8px);border:1px solid #ffb547;cursor:pointer;font-family:var(--mono);font-size:12.5px;font-weight:600}
+.lng span{padding:5px 10px;border-radius:999px;color:var(--fg-2);transition:background .2s,color .2s}
+html[lang="en"] .lng span[data-l="en"],html[lang="es"] .lng span[data-l="es"]{background:#ffb547;color:#140c04}
+.lng:focus-visible{outline:2px solid #ffb547;outline-offset:2px}
+@media (min-width:761px){.nav .wrap{padding-right:max(18px,calc(250px - (100vw - 1100px) / 2))}}
+.idx{position:relative;flex:none}
+.idx-b{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12.5px;font-weight:600;color:#140c04;background:#ffb547;border:0;border-radius:8px;padding:7px 11px;cursor:pointer;transition:filter .2s;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+.idx-b:hover{filter:brightness(1.08)}
+.idx-b:focus-visible{outline:2px solid #f3efe6;outline-offset:2px}
+.idx-b svg{width:15px;height:15px}
+.idx-b .chev{width:12px;height:12px;transition:transform .2s}
+.idx.open .idx-b .chev{transform:rotate(180deg)}
+.idx-p{display:none;position:absolute;right:0;top:calc(100% + 10px);min-width:230px;max-height:calc(100vh - 90px);overflow:auto;background:#11131b;border:1px solid #2a2f3d;border-radius:14px;padding:8px;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.idx.open .idx-p{display:block;animation:idxin .18s ease-out}
+@keyframes idxin{from{opacity:0;transform:translateY(-6px)}}
+.idx-p .il{font-family:var(--mono);font-size:11.5px;letter-spacing:.18em;text-transform:uppercase;color:#7d8597;padding:6px 10px 8px}
+.idx-p a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:#aab1c0;text-decoration:none;font-size:15px;font-family:inherit}
+.idx-p a:before{content:"";width:6px;height:6px;border-radius:50%;background:#2a2f3d;flex:none;transition:background .2s}
+.idx-p a:hover,.idx-p a:focus-visible{background:#1a1e29;color:#f3efe6;outline:none}
+.idx-p a.cur{color:#f3efe6}
+.idx-p a.cur:before{background:#ffb547;box-shadow:0 0 8px #ffb547}
+@media (max-width:640px){.idx-b{padding:7px 9px}.idx-b .chev{display:none}.tr{gap:8px}}
+
+:root{--mono:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif}
+.lbl,.note,.nav a,.chip,.btn,.toggle button,.kpis span,.when,.k,.badge,.meta span,.stk,.st .k,.mt .nm,.spc-k,.hmi-k,.hmi-f,.out span,.ctl .f,.crow .f,.total span,.core small,.ctx span,.gr .nm span,td.stat,.lv .act,.alt .k,.step .k,.stg .k,.rk .t,.var,footer{letter-spacing:.03em!important}
+.lbl,.kpis span,.alt .k,.step .k,.stg .k,.st .k{font-weight:600}
+.kpis b,.cell,#mx,.gt i,.out b,.mt b{font-variant-numeric:tabular-nums}
+
+section{padding-block:56px}
+.note{color:var(--fg-2)}
+html[data-theme="light"]{--fg-2:#3d465e;--fg-3:#535c76;--amber:#925400;--amber-hi:#764300}
+.thm{flex:none;display:inline-grid;place-items:center;width:36px;height:36px;border-radius:999px;cursor:pointer;padding:0;color:#ffb547;background:rgba(7,10,18,.82);border:1px solid #ffb547;backdrop-filter:blur(8px);transition:transform .2s}
+.thm:hover{transform:rotate(-12deg)}
+.thm:focus-visible{outline:2px solid #ffb547;outline-offset:2px}
+.thm svg{width:17px;height:17px;grid-area:1/1}
+html[data-theme="dark"] .thm .i-moon,html[data-theme="light"] .thm .i-sun{display:none}
+
+html[data-theme="light"]{--night:#f5f3ee;--night-2:#ebe8e0;--panel:#ffffff;--panel-2:#f2f0ea;--line:#dcd7cc;--fg:#141b2b;--fg-2:#454f68;--fg-3:#66708c;
+ --amber:#a96300;--amber-hi:#8a5000;--amber-bg:rgba(214,138,20,.11);--amber-line:rgba(169,99,0,.42);--led:#2b5cbd;--led-bg:rgba(43,92,189,.08);
+ --red:#cf3737;--red-bg:rgba(207,55,55,.1);--yel:#a97400;--yel-bg:rgba(214,160,20,.15);--grn:#16895a;--grn-bg:rgba(22,137,90,.11);color-scheme:light}
+html[data-theme="light"] .nav{background:rgba(245,243,238,.92)}
+html[data-theme="light"] .panel,html[data-theme="light"] .alt,html[data-theme="light"] .mod,html[data-theme="light"] .k{box-shadow:0 1px 2px rgba(20,27,43,.05),0 6px 18px rgba(20,27,43,.05)}
+html[data-theme="light"] .stop:before{box-shadow:0 0 0 5px var(--night),0 0 14px 2px rgba(214,138,20,.45)}
+html[data-theme="light"] .gt i{background:rgba(43,92,189,.18);color:#1a2b55}
+html[data-theme="light"] .gt i.pilot{background:#ffb547;color:#2a1a00}
+html[data-theme="light"] .toggle button[aria-pressed="true"],html[data-theme="light"] .alt.pick .badge{background:#ffb547;color:#1b1206}
+html[data-theme="light"] .total b,html[data-theme="light"] .kpis .lit b{text-shadow:none}
+html[data-theme="light"] .bar .fl{box-shadow:none}
+
+.scene *{transition:fill .9s ease,stroke .9s ease,opacity .9s ease,stop-color .9s ease,transform 1.2s cubic-bezier(.3,.7,.2,1)}
+.scene .d-only{opacity:0}
+html[data-theme="light"] .scene .d-only{opacity:1}
+.scene .d-sun{transform:translateY(120px)}
+html[data-theme="light"] .scene .d-sun{transform:none}
+.scene .d-cloud{transform:translateX(-80px)}
+html[data-theme="light"] .scene .d-cloud{transform:none}
+.d-beam{animation:beam 6s ease-in-out infinite}
+@keyframes beam{50%{opacity:.6}}
+
+html[data-theme="light"] .hero:after{background:linear-gradient(90deg,rgba(245,243,238,.94) 0%,rgba(245,243,238,.72) 38%,rgba(245,243,238,0) 70%),linear-gradient(0deg,var(--night) 0%,rgba(245,243,238,0) 30%)}
+@media (max-width:760px){html[data-theme="light"] .hero:after{background:linear-gradient(180deg,rgba(245,243,238,0) 0,rgba(245,243,238,0) 200px,var(--night) 350px)}}
+html[data-theme="light"] .kpis div{background:rgba(255,255,255,.88)}
+html[data-theme="light"] .kpis .lit{background:rgba(255,236,200,.9)}
+html[data-theme="light"] .hero h1 em{text-shadow:none}
+html[data-theme="light"] .scene stop[stop-color="#04070f"]{stop-color:#4f9fe3}
+html[data-theme="light"] .scene stop[stop-color="#0a1224"]{stop-color:#bfe0f8}
+html[data-theme="light"] .scene stop[stop-color="#131b2e"]{stop-color:#d8d4c6}
+html[data-theme="light"] .scene stop[stop-color="#07090f"]{stop-color:#aaa594}
+html[data-theme="light"] .scene #hglow stop{stop-opacity:0}
+html[data-theme="light"] .scene circle[fill="#cfd8ee"],html[data-theme="light"] .scene rect[fill="#ffcf7a"]{opacity:0}
+html[data-theme="light"] .scene rect[fill="#0c1220"]{fill:#8195ae}
+html[data-theme="light"] .scene rect[fill="#090c14"]{fill:#a6a390}
+html[data-theme="light"] .scene stop[stop-color="#151a26"]{stop-color:#59616f}
+html[data-theme="light"] .scene stop[stop-color="#1d2331"]{stop-color:#6c7482}
+html[data-theme="light"] .scene [stroke="#2b3346"]{stroke:#56606f}
+html[data-theme="light"] .scene rect[fill="#39425a"]{fill:#6e7889}
+html[data-theme="light"] .scene .cone,html[data-theme="light"] .scene ellipse[fill="url(#pool)"]{opacity:0}
+html[data-theme="light"] .scene .glow{animation:none;opacity:.12}
+html[data-theme="light"] .scene .car ellipse{opacity:.08}
+.nav{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(7,10,18,.97)!important}
+html[data-theme="light"] .nav{background:rgba(245,243,238,.97)!important}
+.back-home,.lng,.thm,.kpis div{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.back-home,.lng,.thm{background:rgba(7,10,18,.94)}
+.off,.off *{animation-play-state:paused!important}
+.back-home{font-weight:700}
+html[data-theme="dark"] .lng span{color:#ece6dc}
+html[data-theme="dark"] .back-home{color:#ffb547;border-width:1.5px}
+html[data-theme="light"] .back-home,html[data-theme="light"] .lng,html[data-theme="light"] .thm{background:rgba(255,255,255,.94);border-color:#a96300;box-shadow:0 6px 18px rgba(20,20,30,.12)}
+html[data-theme="light"] .back-home,html[data-theme="light"] .thm{color:#a96300}
+html[data-theme="light"] .back-home:hover,html[data-theme="light"] .back-home:focus-visible{background:#ffb547;color:#140c04}
+html[data-theme="light"] .lng span{color:#5b6070}
+html[data-theme="light"] .idx-b{box-shadow:0 6px 18px rgba(20,20,30,.15)}
+html[data-theme="light"] .idx-p{background:#ffffff;border-color:#ddd7cc;box-shadow:0 18px 40px -12px rgba(21,23,30,.25)}
+html[data-theme="light"] .idx-p .il{color:#6f7483}
+html[data-theme="light"] .idx-p a{color:#474c5b}
+html[data-theme="light"] .idx-p a:before{background:#d1ccc1}
+html[data-theme="light"] .idx-p a:hover,html[data-theme="light"] .idx-p a:focus-visible{background:#f3f1ec;color:#15171e}
+html[data-theme="light"] .idx-p a.cur{color:#15171e;background:#f3f1ec}
+.idx-p a.cur{background:#1a1e29}
+</style>
+</head>
+<body>
+
+<a class="back-home" href="../" aria-label="Back to portfolio home"><span aria-hidden="true">←</span> Portfolio</a>
+<div class="tr"><div class="idx" id="idx"><button class="idx-b" id="idx-b" type="button" aria-expanded="false" aria-controls="idx-p"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg><span>Index</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><nav class="idx-p" id="idx-p" aria-label="Index"><div class="il">Index</div></nav></div><button class="thm" id="thm" type="button" aria-label="Switch to light mode"><svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg><svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg></button><button class="lng" id="lng" type="button" aria-label="Cambiar a español"><span data-l="en">EN</span><span data-l="es">ES</span></button></div>
+<header class="hero">
+  <svg class="scene" viewBox="0 0 1200 560" preserveAspectRatio="xMaxYMax slice" aria-hidden="true" focusable="false">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#04070f"/><stop offset=".55" stop-color="#0a1224"/><stop offset=".6" stop-color="#131b2e"/><stop offset="1" stop-color="#07090f"/></linearGradient>
+<radialGradient id="hglow" cx="640" cy="330" r="420" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffb547" stop-opacity=".22"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
+<radialGradient id="lg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff3d6" stop-opacity="1"/><stop offset=".25" stop-color="#ffc56b" stop-opacity=".55"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
+<linearGradient id="cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcf7a" stop-opacity=".32"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></linearGradient>
+<radialGradient id="pool" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffcf7a" stop-opacity=".28"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></radialGradient>
+<linearGradient id="road" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151a26"/><stop offset="1" stop-color="#1d2331"/></linearGradient>
+</defs>
+<rect width="1200" height="560" fill="url(#sky)"/>
+<circle cx="389" cy="44" r="0.6" fill="#cfd8ee" opacity="0.18"/>
+<circle cx="643" cy="106" r="0.6" fill="#cfd8ee" opacity="0.56"/>
+<circle cx="258" cy="25" r="1.2" fill="#cfd8ee" opacity="0.18"/>
+<circle cx="109" cy="123" r="0.6" fill="#cfd8ee" opacity="0.58"/>
+<circle cx="757" cy="169" r="0.6" fill="#cfd8ee" opacity="0.41"/>
+<circle cx="476" cy="283" r="0.6" fill="#cfd8ee" opacity="0.40"/>
+<circle cx="160" cy="122" r="0.6" fill="#cfd8ee" opacity="0.41"/>
+<circle cx="672" cy="198" r="0.6" fill="#cfd8ee" opacity="0.41"/>
+<circle cx="767" cy="108" r="0.6" fill="#cfd8ee" opacity="0.40"/>
+<circle cx="743" cy="144" r="1.2" fill="#cfd8ee" opacity="0.50"/>
+<circle cx="559" cy="268" r="1" fill="#cfd8ee" opacity="0.28"/>
+<circle cx="953" cy="203" r="0.8" fill="#cfd8ee" opacity="0.19"/>
+<circle cx="360" cy="144" r="1" fill="#cfd8ee" opacity="0.48"/>
+<circle cx="346" cy="284" r="0.6" fill="#cfd8ee" opacity="0.38"/>
+<circle cx="198" cy="99" r="1.2" fill="#cfd8ee" opacity="0.34"/>
+<circle cx="1154" cy="23" r="1" fill="#cfd8ee" opacity="0.30"/>
+<circle cx="420" cy="144" r="1.2" fill="#cfd8ee" opacity="0.18"/>
+<circle cx="112" cy="78" r="0.6" fill="#cfd8ee" opacity="0.18"/>
+<circle cx="842" cy="188" r="1.2" fill="#cfd8ee" opacity="0.28"/>
+<circle cx="463" cy="194" r="0.6" fill="#cfd8ee" opacity="0.57"/>
+<circle cx="427" cy="177" r="1.2" fill="#cfd8ee" opacity="0.18"/>
+<circle cx="922" cy="38" r="0.8" fill="#cfd8ee" opacity="0.33"/>
+<circle cx="1100" cy="144" r="0.8" fill="#cfd8ee" opacity="0.35"/>
+<circle cx="659" cy="256" r="1.2" fill="#cfd8ee" opacity="0.54"/>
+<circle cx="334" cy="120" r="1" fill="#cfd8ee" opacity="0.46"/>
+<circle cx="457" cy="67" r="0.6" fill="#cfd8ee" opacity="0.23"/>
+<circle cx="278" cy="68" r="1.2" fill="#cfd8ee" opacity="0.52"/>
+<circle cx="219" cy="82" r="0.8" fill="#cfd8ee" opacity="0.34"/>
+<circle cx="443" cy="164" r="0.8" fill="#cfd8ee" opacity="0.46"/>
+<circle cx="619" cy="179" r="0.6" fill="#cfd8ee" opacity="0.36"/>
+<circle cx="1045" cy="276" r="1.2" fill="#cfd8ee" opacity="0.33"/>
+<circle cx="473" cy="140" r="1.2" fill="#cfd8ee" opacity="0.18"/>
+<circle cx="81" cy="61" r="0.8" fill="#cfd8ee" opacity="0.20"/>
+<circle cx="721" cy="30" r="0.8" fill="#cfd8ee" opacity="0.39"/>
+<circle cx="1139" cy="178" r="0.6" fill="#cfd8ee" opacity="0.54"/>
+<circle cx="737" cy="43" r="1" fill="#cfd8ee" opacity="0.58"/>
+<circle cx="723" cy="138" r="0.6" fill="#cfd8ee" opacity="0.53"/>
+<circle cx="1192" cy="135" r="1.2" fill="#cfd8ee" opacity="0.29"/>
+<circle cx="173" cy="217" r="1" fill="#cfd8ee" opacity="0.37"/>
+<circle cx="830" cy="150" r="0.8" fill="#cfd8ee" opacity="0.58"/>
+<circle cx="634" cy="43" r="0.6" fill="#cfd8ee" opacity="0.49"/>
+<circle cx="358" cy="186" r="0.6" fill="#cfd8ee" opacity="0.46"/>
+<circle cx="313" cy="106" r="0.8" fill="#cfd8ee" opacity="0.31"/>
+<circle cx="267" cy="157" r="1" fill="#cfd8ee" opacity="0.44"/>
+<circle cx="736" cy="229" r="0.8" fill="#cfd8ee" opacity="0.51"/>
+<circle cx="982" cy="215" r="0.8" fill="#cfd8ee" opacity="0.24"/>
+<circle cx="591" cy="212" r="0.6" fill="#cfd8ee" opacity="0.51"/>
+<circle cx="567" cy="56" r="1" fill="#cfd8ee" opacity="0.35"/>
+<circle cx="1124" cy="287" r="1" fill="#cfd8ee" opacity="0.19"/>
+<circle cx="123" cy="136" r="1" fill="#cfd8ee" opacity="0.24"/>
+<circle cx="749" cy="261" r="0.6" fill="#cfd8ee" opacity="0.37"/>
+<circle cx="784" cy="232" r="0.6" fill="#cfd8ee" opacity="0.53"/>
+<circle cx="144" cy="113" r="0.8" fill="#cfd8ee" opacity="0.37"/>
+<circle cx="214" cy="229" r="1" fill="#cfd8ee" opacity="0.19"/>
+<circle cx="1135" cy="209" r="1.2" fill="#cfd8ee" opacity="0.33"/>
+<circle cx="1136" cy="210" r="0.8" fill="#cfd8ee" opacity="0.60"/>
+<circle cx="33" cy="171" r="1.2" fill="#cfd8ee" opacity="0.51"/>
+<circle cx="175" cy="240" r="1.2" fill="#cfd8ee" opacity="0.45"/>
+<circle cx="420" cy="159" r="0.8" fill="#cfd8ee" opacity="0.16"/>
+<circle cx="959" cy="211" r="0.6" fill="#cfd8ee" opacity="0.39"/>
+<circle cx="1120" cy="126" r="0.8" fill="#cfd8ee" opacity="0.52"/>
+<circle cx="253" cy="73" r="1" fill="#cfd8ee" opacity="0.38"/>
+<circle cx="916" cy="95" r="1.2" fill="#cfd8ee" opacity="0.53"/>
+<circle cx="73" cy="215" r="1.2" fill="#cfd8ee" opacity="0.45"/>
+<circle cx="978" cy="150" r="0.8" fill="#cfd8ee" opacity="0.39"/>
+<circle cx="628" cy="5" r="1.2" fill="#cfd8ee" opacity="0.50"/>
+<circle cx="730" cy="225" r="0.8" fill="#cfd8ee" opacity="0.23"/>
+<circle cx="568" cy="210" r="0.6" fill="#cfd8ee" opacity="0.30"/>
+<circle cx="622" cy="161" r="0.6" fill="#cfd8ee" opacity="0.55"/>
+<circle cx="68" cy="55" r="0.6" fill="#cfd8ee" opacity="0.50"/>
+<rect width="1200" height="560" fill="url(#hglow)"/>
+<g class="d-only"><g class="d-sun"><circle cx="1040" cy="96" r="70" fill="#ffd36b" opacity=".18"/><circle cx="1040" cy="96" r="38" fill="#ffd36b"/></g><g class="d-cloud" fill="#ffffff"><ellipse cx="300" cy="90" rx="70" ry="16" opacity=".9"/><ellipse cx="340" cy="78" rx="40" ry="20" opacity=".9"/><ellipse cx="760" cy="150" rx="56" ry="12" opacity=".8"/><ellipse cx="790" cy="140" rx="30" ry="15" opacity=".8"/><ellipse cx="560" cy="60" rx="44" ry="10" opacity=".7"/></g></g>
+<rect x="0" y="275" width="41" height="55" fill="#0c1220"/>
+<rect x="23" y="290" width="3" height="4" fill="#ffcf7a" opacity="0.64"/>
+<rect x="32" y="308" width="3" height="4" fill="#ffcf7a" opacity="0.63"/>
+<rect x="14" y="317" width="3" height="4" fill="#ffcf7a" opacity="0.61"/>
+<rect x="32" y="317" width="3" height="4" fill="#ffcf7a" opacity="0.38"/>
+<rect x="45" y="289" width="34" height="41" fill="#0c1220"/>
+<rect x="68" y="295" width="3" height="4" fill="#ffcf7a" opacity="0.53"/>
+<rect x="50" y="304" width="3" height="4" fill="#ffcf7a" opacity="0.57"/>
+<rect x="59" y="322" width="3" height="4" fill="#ffcf7a" opacity="0.52"/>
+<rect x="68" y="322" width="3" height="4" fill="#ffcf7a" opacity="0.34"/>
+<rect x="83" y="272" width="56" height="58" fill="#0c1220"/>
+<rect x="106" y="278" width="3" height="4" fill="#ffcf7a" opacity="0.27"/>
+<rect x="133" y="305" width="3" height="4" fill="#ffcf7a" opacity="0.44"/>
+<rect x="97" y="314" width="3" height="4" fill="#ffcf7a" opacity="0.53"/>
+<rect x="115" y="314" width="3" height="4" fill="#ffcf7a" opacity="0.53"/>
+<rect x="115" y="323" width="3" height="4" fill="#ffcf7a" opacity="0.28"/>
+<rect x="143" y="274" width="30" height="56" fill="#0c1220"/>
+<rect x="166" y="307" width="3" height="4" fill="#ffcf7a" opacity="0.51"/>
+<rect x="173" y="296" width="56" height="34" fill="#0c1220"/>
+<rect x="196" y="302" width="3" height="4" fill="#ffcf7a" opacity="0.39"/>
+<rect x="187" y="311" width="3" height="4" fill="#ffcf7a" opacity="0.40"/>
+<rect x="178" y="320" width="3" height="4" fill="#ffcf7a" opacity="0.49"/>
+<rect x="233" y="300" width="40" height="30" fill="#0c1220"/>
+<rect x="238" y="315" width="3" height="4" fill="#ffcf7a" opacity="0.38"/>
+<rect x="278" y="278" width="56" height="52" fill="#0c1220"/>
+<rect x="283" y="284" width="3" height="4" fill="#ffcf7a" opacity="0.25"/>
+<rect x="310" y="302" width="3" height="4" fill="#ffcf7a" opacity="0.51"/>
+<rect x="283" y="311" width="3" height="4" fill="#ffcf7a" opacity="0.66"/>
+<rect x="283" y="320" width="3" height="4" fill="#ffcf7a" opacity="0.59"/>
+<rect x="292" y="320" width="3" height="4" fill="#ffcf7a" opacity="0.38"/>
+<rect x="340" y="282" width="61" height="48" fill="#0c1220"/>
+<rect x="381" y="297" width="3" height="4" fill="#ffcf7a" opacity="0.61"/>
+<rect x="363" y="306" width="3" height="4" fill="#ffcf7a" opacity="0.53"/>
+<rect x="381" y="306" width="3" height="4" fill="#ffcf7a" opacity="0.37"/>
+<rect x="381" y="315" width="3" height="4" fill="#ffcf7a" opacity="0.27"/>
+<rect x="390" y="315" width="3" height="4" fill="#ffcf7a" opacity="0.31"/>
+<rect x="345" y="324" width="3" height="4" fill="#ffcf7a" opacity="0.69"/>
+<rect x="363" y="324" width="3" height="4" fill="#ffcf7a" opacity="0.48"/>
+<rect x="404" y="303" width="66" height="27" fill="#0c1220"/>
+<rect x="454" y="309" width="3" height="4" fill="#ffcf7a" opacity="0.50"/>
+<rect x="418" y="318" width="3" height="4" fill="#ffcf7a" opacity="0.33"/>
+<rect x="471" y="303" width="66" height="27" fill="#0c1220"/>
+<rect x="512" y="318" width="3" height="4" fill="#ffcf7a" opacity="0.44"/>
+<rect x="543" y="320" width="59" height="10" fill="#0c1220"/>
+<rect x="607" y="302" width="30" height="28" fill="#0c1220"/>
+<rect x="637" y="320" width="45" height="10" fill="#0c1220"/>
+<rect x="688" y="301" width="43" height="29" fill="#0c1220"/>
+<rect x="693" y="307" width="3" height="4" fill="#ffcf7a" opacity="0.62"/>
+<rect x="720" y="316" width="3" height="4" fill="#ffcf7a" opacity="0.51"/>
+<rect x="693" y="325" width="3" height="4" fill="#ffcf7a" opacity="0.31"/>
+<rect x="711" y="325" width="3" height="4" fill="#ffcf7a" opacity="0.29"/>
+<rect x="720" y="325" width="3" height="4" fill="#ffcf7a" opacity="0.65"/>
+<rect x="736" y="307" width="50" height="23" fill="#0c1220"/>
+<rect x="741" y="313" width="3" height="4" fill="#ffcf7a" opacity="0.26"/>
+<rect x="759" y="313" width="3" height="4" fill="#ffcf7a" opacity="0.63"/>
+<rect x="768" y="322" width="3" height="4" fill="#ffcf7a" opacity="0.60"/>
+<rect x="789" y="284" width="62" height="46" fill="#0c1220"/>
+<rect x="803" y="290" width="3" height="4" fill="#ffcf7a" opacity="0.59"/>
+<rect x="821" y="290" width="3" height="4" fill="#ffcf7a" opacity="0.40"/>
+<rect x="803" y="299" width="3" height="4" fill="#ffcf7a" opacity="0.36"/>
+<rect x="821" y="308" width="3" height="4" fill="#ffcf7a" opacity="0.48"/>
+<rect x="803" y="317" width="3" height="4" fill="#ffcf7a" opacity="0.56"/>
+<rect x="852" y="306" width="49" height="24" fill="#0c1220"/>
+<rect x="875" y="312" width="3" height="4" fill="#ffcf7a" opacity="0.29"/>
+<rect x="901" y="281" width="34" height="49" fill="#0c1220"/>
+<rect x="915" y="323" width="3" height="4" fill="#ffcf7a" opacity="0.47"/>
+<rect x="936" y="269" width="42" height="61" fill="#0c1220"/>
+<rect x="941" y="275" width="3" height="4" fill="#ffcf7a" opacity="0.41"/>
+<rect x="968" y="275" width="3" height="4" fill="#ffcf7a" opacity="0.70"/>
+<rect x="981" y="293" width="66" height="37" fill="#0c1220"/>
+<rect x="1022" y="308" width="3" height="4" fill="#ffcf7a" opacity="0.29"/>
+<rect x="1013" y="317" width="3" height="4" fill="#ffcf7a" opacity="0.40"/>
+<rect x="1050" y="288" width="58" height="42" fill="#0c1220"/>
+<rect x="1091" y="294" width="3" height="4" fill="#ffcf7a" opacity="0.37"/>
+<rect x="1055" y="303" width="3" height="4" fill="#ffcf7a" opacity="0.65"/>
+<rect x="1073" y="303" width="3" height="4" fill="#ffcf7a" opacity="0.67"/>
+<rect x="1082" y="321" width="3" height="4" fill="#ffcf7a" opacity="0.47"/>
+<rect x="1112" y="278" width="48" height="52" fill="#0c1220"/>
+<rect x="1117" y="293" width="3" height="4" fill="#ffcf7a" opacity="0.65"/>
+<rect x="1135" y="293" width="3" height="4" fill="#ffcf7a" opacity="0.67"/>
+<rect x="1144" y="293" width="3" height="4" fill="#ffcf7a" opacity="0.40"/>
+<rect x="1117" y="311" width="3" height="4" fill="#ffcf7a" opacity="0.28"/>
+<rect x="1153" y="320" width="3" height="4" fill="#ffcf7a" opacity="0.48"/>
+<rect x="1164" y="275" width="52" height="55" fill="#0c1220"/>
+<rect x="1205" y="290" width="3" height="4" fill="#ffcf7a" opacity="0.37"/>
+<rect x="1169" y="299" width="3" height="4" fill="#ffcf7a" opacity="0.30"/>
+<rect x="1169" y="317" width="3" height="4" fill="#ffcf7a" opacity="0.43"/>
+<rect y="330" width="1200" height="230" fill="#090c14"/>
+<polygon points="260,560 1300,560 654,330 626,330" fill="url(#road)"/>
+<line x1="300" y1="560" x2="628" y2="330" stroke="#c9cfdb" stroke-opacity=".35" stroke-width="2"/>
+<line x1="1260" y1="560" x2="652" y2="330" stroke="#c9cfdb" stroke-opacity=".35" stroke-width="2"/>
+<line x1="640.0" y1="330.0" x2="640.1" y2="330.1" stroke="#f0c15a" stroke-opacity=".7" stroke-width="0.6"/>
+<line x1="640.4" y1="330.7" x2="641.0" y2="331.6" stroke="#f0c15a" stroke-opacity=".7" stroke-width="0.6"/>
+<line x1="641.9" y1="333.2" x2="643.0" y2="335.0" stroke="#f0c15a" stroke-opacity=".7" stroke-width="0.7"/>
+<line x1="644.7" y1="337.8" x2="646.4" y2="340.6" stroke="#f0c15a" stroke-opacity=".7" stroke-width="0.8"/>
+<line x1="648.9" y1="344.6" x2="651.2" y2="348.5" stroke="#f0c15a" stroke-opacity=".7" stroke-width="1.0"/>
+<line x1="654.5" y1="353.9" x2="657.6" y2="358.9" stroke="#f0c15a" stroke-opacity=".7" stroke-width="1.3"/>
+<line x1="661.7" y1="365.7" x2="665.4" y2="371.8" stroke="#f0c15a" stroke-opacity=".7" stroke-width="1.6"/>
+<line x1="670.5" y1="380.1" x2="674.9" y2="387.4" stroke="#f0c15a" stroke-opacity=".7" stroke-width="1.9"/>
+<line x1="680.9" y1="397.1" x2="686.1" y2="405.7" stroke="#f0c15a" stroke-opacity=".7" stroke-width="2.4"/>
+<line x1="693.0" y1="417.0" x2="699.0" y2="426.9" stroke="#f0c15a" stroke-opacity=".7" stroke-width="2.9"/>
+<line x1="706.8" y1="439.7" x2="713.6" y2="450.9" stroke="#f0c15a" stroke-opacity=".7" stroke-width="3.4"/>
+<line x1="722.4" y1="465.3" x2="730.0" y2="477.8" stroke="#f0c15a" stroke-opacity=".7" stroke-width="4.1"/>
+<line x1="739.7" y1="493.8" x2="748.1" y2="507.7" stroke="#f0c15a" stroke-opacity=".7" stroke-width="4.8"/>
+<line x1="758.9" y1="525.4" x2="768.2" y2="540.6" stroke="#f0c15a" stroke-opacity=".7" stroke-width="5.5"/>
+<g class="car c-in"><ellipse cx="0" cy="0" rx="44" ry="10" fill="#fff6dc" opacity=".25"/><circle cx="-9" cy="0" r="3.2" fill="#fffaf0"/><circle cx="9" cy="0" r="3.2" fill="#fffaf0"/></g>
+<g class="car c-out"><circle cx="-9" cy="0" r="2.8" fill="#ff4d4d"/><circle cx="9" cy="0" r="2.8" fill="#ff4d4d"/><ellipse cx="0" cy="0" rx="30" ry="8" fill="#ff4d4d" opacity=".25"/></g>
+<g class="lit" style="animation-delay:0.33s">
+<ellipse cx="672.0" cy="335.9" rx="10.7" ry="2.0" fill="url(#pool)"/>
+<polygon class="cone" points="671.4,319.7 672.5,319.7 678.2,335.9 665.7,335.9" fill="url(#cone)"/>
+<line x1="676.1" y1="335.9" x2="676.1" y2="318.9" stroke="#2b3346" stroke-width="1.0"/>
+<path d="M676.1 318.9 Q 676.1 318.0 672.0 319.1" stroke="#2b3346" stroke-width="1.0" fill="none"/>
+<rect x="670.9" y="319.0" width="2.1" height="0.6" rx="0.3" fill="#39425a"/>
+<circle class="glow g0" cx="672.0" cy="319.7" r="3.4" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:0.33s">
+<ellipse cx="615.0" cy="335.9" rx="10.7" ry="2.0" fill="url(#pool)"/>
+<polygon class="cone" points="614.4,319.7 615.5,319.7 621.2,335.9 608.7,335.9" fill="url(#cone)"/>
+<line x1="610.9" y1="335.9" x2="610.9" y2="318.9" stroke="#2b3346" stroke-width="1.0"/>
+<path d="M610.9 318.9 Q 610.9 318.0 615.0 319.1" stroke="#2b3346" stroke-width="1.0" fill="none"/>
+<rect x="613.9" y="319.0" width="2.1" height="0.6" rx="0.3" fill="#39425a"/>
+<circle class="glow g1" cx="615.0" cy="319.7" r="3.4" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:0.43s">
+<ellipse cx="706.7" cy="352.0" rx="20.4" ry="3.7" fill="url(#pool)"/>
+<polygon class="cone" points="705.7,321.2 707.8,321.2 718.6,352.0 694.8,352.0" fill="url(#cone)"/>
+<line x1="714.6" y1="352.0" x2="714.6" y2="319.7" stroke="#2b3346" stroke-width="1.0"/>
+<path d="M714.6 319.7 Q 714.6 318.0 706.7 320.0" stroke="#2b3346" stroke-width="1.0" fill="none"/>
+<rect x="704.7" y="319.9" width="4.1" height="1.2" rx="0.5" fill="#39425a"/>
+<circle class="glow g1" cx="706.7" cy="321.2" r="6.5" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:0.43s">
+<ellipse cx="599.2" cy="352.0" rx="20.4" ry="3.7" fill="url(#pool)"/>
+<polygon class="cone" points="598.2,321.2 600.2,321.2 611.1,352.0 587.3,352.0" fill="url(#cone)"/>
+<line x1="591.4" y1="352.0" x2="591.4" y2="319.7" stroke="#2b3346" stroke-width="1.0"/>
+<path d="M591.4 319.7 Q 591.4 318.0 599.2 320.0" stroke="#2b3346" stroke-width="1.0" fill="none"/>
+<rect x="597.1" y="319.9" width="4.1" height="1.2" rx="0.5" fill="#39425a"/>
+<circle class="glow g2" cx="599.2" cy="321.2" r="6.5" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:0.58s">
+<ellipse cx="761.8" cy="377.6" rx="35.7" ry="6.6" fill="url(#pool)"/>
+<polygon class="cone" points="760.1,323.7 763.6,323.7 782.7,377.6 741.0,377.6" fill="url(#cone)"/>
+<line x1="775.6" y1="377.6" x2="775.6" y2="321.0" stroke="#2b3346" stroke-width="1.5"/>
+<path d="M775.6 321.0 Q 775.6 318.0 761.8 321.6" stroke="#2b3346" stroke-width="1.2" fill="none"/>
+<rect x="758.3" y="321.3" width="7.1" height="2.1" rx="0.9" fill="#39425a"/>
+<circle class="glow g2" cx="761.8" cy="323.7" r="11.3" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:0.58s">
+<ellipse cx="574.1" cy="377.6" rx="35.7" ry="6.6" fill="url(#pool)"/>
+<polygon class="cone" points="572.3,323.7 575.9,323.7 595.0,377.6 553.3,377.6" fill="url(#cone)"/>
+<line x1="560.4" y1="377.6" x2="560.4" y2="321.0" stroke="#2b3346" stroke-width="1.5"/>
+<path d="M560.4 321.0 Q 560.4 318.0 574.1 321.6" stroke="#2b3346" stroke-width="1.2" fill="none"/>
+<rect x="570.6" y="321.3" width="7.1" height="2.1" rx="0.9" fill="#39425a"/>
+<circle class="glow g0" cx="574.1" cy="323.7" r="11.3" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:0.78s">
+<ellipse cx="836.5" cy="412.2" rx="56.5" ry="10.4" fill="url(#pool)"/>
+<polygon class="cone" points="833.7,326.9 839.3,326.9 869.4,412.2 803.5,412.2" fill="url(#cone)"/>
+<line x1="858.1" y1="412.2" x2="858.1" y2="322.7" stroke="#2b3346" stroke-width="2.4"/>
+<path d="M858.1 322.7 Q 858.1 318.0 836.5 323.7" stroke="#2b3346" stroke-width="1.9" fill="none"/>
+<rect x="830.8" y="323.2" width="11.3" height="3.3" rx="1.4" fill="#39425a"/>
+<circle class="glow g0" cx="836.5" cy="326.9" r="17.9" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:0.78s">
+<ellipse cx="540.2" cy="412.2" rx="56.5" ry="10.4" fill="url(#pool)"/>
+<polygon class="cone" points="537.4,326.9 543.0,326.9 573.2,412.2 507.2,412.2" fill="url(#cone)"/>
+<line x1="518.5" y1="412.2" x2="518.5" y2="322.7" stroke="#2b3346" stroke-width="2.4"/>
+<path d="M518.5 322.7 Q 518.5 318.0 540.2 323.7" stroke="#2b3346" stroke-width="1.9" fill="none"/>
+<rect x="534.6" y="323.2" width="11.3" height="3.3" rx="1.4" fill="#39425a"/>
+<circle class="glow g1" cx="540.2" cy="326.9" r="17.9" fill="url(#lg)"/>
+</g>
+<g class="signal">
+<line x1="926" y1="424" x2="926" y2="296" stroke="#2b3346" stroke-width="5"/>
+<line x1="926" y1="302" x2="700" y2="302" stroke="#2b3346" stroke-width="4"/>
+<line x1="904" y1="302" x2="926" y2="324" stroke="#2b3346" stroke-width="2.5"/>
+<rect x="719" y="306" width="22" height="58" rx="4" fill="#141924" stroke="#39425a"/>
+<circle cx="730" cy="319" r="6" fill="#222838"/>
+<circle class="sl sr" cx="730" cy="319" r="6" fill="#ff5b5b"/>
+<circle class="sl sr halo" cx="730" cy="319" r="17" fill="#ff5b5b" fill-opacity=".22"/>
+<circle cx="730" cy="335" r="6" fill="#222838"/>
+<circle class="sl sa" cx="730" cy="335" r="6" fill="#ffc145"/>
+<circle class="sl sa halo" cx="730" cy="335" r="17" fill="#ffc145" fill-opacity=".22"/>
+<circle cx="730" cy="351" r="6" fill="#222838"/>
+<circle class="sl sg" cx="730" cy="351" r="6" fill="#4fd89b"/>
+<circle class="sl sg halo" cx="730" cy="351" r="17" fill="#4fd89b" fill-opacity=".22"/>
+<rect x="809" y="306" width="22" height="58" rx="4" fill="#141924" stroke="#39425a"/>
+<circle cx="820" cy="319" r="6" fill="#222838"/>
+<circle class="sl sr" cx="820" cy="319" r="6" fill="#ff5b5b"/>
+<circle class="sl sr halo" cx="820" cy="319" r="17" fill="#ff5b5b" fill-opacity=".22"/>
+<circle cx="820" cy="335" r="6" fill="#222838"/>
+<circle class="sl sa" cx="820" cy="335" r="6" fill="#ffc145"/>
+<circle class="sl sa halo" cx="820" cy="335" r="17" fill="#ffc145" fill-opacity=".22"/>
+<circle cx="820" cy="351" r="6" fill="#222838"/>
+<circle class="sl sg" cx="820" cy="351" r="6" fill="#4fd89b"/>
+<circle class="sl sg halo" cx="820" cy="351" r="17" fill="#4fd89b" fill-opacity=".22"/>
+</g>
+<g class="lit" style="animation-delay:1.04s">
+<ellipse cx="930.1" cy="455.6" rx="82.6" ry="15.1" fill="url(#pool)"/>
+<polygon class="cone" points="925.9,331.1 934.2,331.1 978.2,455.6 881.9,455.6" fill="url(#cone)"/>
+<line x1="961.7" y1="455.6" x2="961.7" y2="324.9" stroke="#2b3346" stroke-width="3.4"/>
+<path d="M961.7 324.9 Q 961.7 318.0 930.1 326.3" stroke="#2b3346" stroke-width="2.8" fill="none"/>
+<rect x="921.8" y="325.6" width="16.5" height="4.8" rx="2.1" fill="#39425a"/>
+<circle class="glow g1" cx="930.1" cy="331.1" r="26.1" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:1.04s">
+<ellipse cx="497.7" cy="455.6" rx="82.6" ry="15.1" fill="url(#pool)"/>
+<polygon class="cone" points="493.5,331.1 501.8,331.1 545.8,455.6 449.5,455.6" fill="url(#cone)"/>
+<line x1="466.0" y1="455.6" x2="466.0" y2="324.9" stroke="#2b3346" stroke-width="3.4"/>
+<path d="M466.0 324.9 Q 466.0 318.0 497.7 326.3" stroke="#2b3346" stroke-width="2.8" fill="none"/>
+<rect x="489.4" y="325.6" width="16.5" height="4.8" rx="2.1" fill="#39425a"/>
+<circle class="glow g2" cx="497.7" cy="331.1" r="26.1" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:1.34s">
+<ellipse cx="1042.2" cy="507.6" rx="113.7" ry="20.9" fill="url(#pool)"/>
+<polygon class="cone" points="1036.5,336.0 1047.9,336.0 1108.5,507.6 975.8,507.6" fill="url(#cone)"/>
+<line x1="1085.8" y1="507.6" x2="1085.8" y2="327.5" stroke="#2b3346" stroke-width="4.7"/>
+<path d="M1085.8 327.5 Q 1085.8 318.0 1042.2 329.4" stroke="#2b3346" stroke-width="3.8" fill="none"/>
+<rect x="1030.8" y="328.4" width="22.7" height="6.6" rx="2.8" fill="#39425a"/>
+<circle class="glow g2" cx="1042.2" cy="336.0" r="36.0" fill="url(#lg)"/>
+</g>
+<g class="lit" style="animation-delay:1.70s">
+<ellipse cx="1172.5" cy="568.0" rx="150.0" ry="27.5" fill="url(#pool)"/>
+<polygon class="cone" points="1165.0,341.8 1180.0,341.8 1260.0,568.0 1085.0,568.0" fill="url(#cone)"/>
+<line x1="1230.0" y1="568.0" x2="1230.0" y2="330.5" stroke="#2b3346" stroke-width="6.2"/>
+<path d="M1230.0 330.5 Q 1230.0 318.0 1172.5 333.0" stroke="#2b3346" stroke-width="5.0" fill="none"/>
+<rect x="1157.5" y="331.8" width="30.0" height="8.8" rx="3.8" fill="#39425a"/>
+<circle class="glow g0" cx="1172.5" cy="341.8" r="47.5" fill="url(#lg)"/>
+</g>
+</svg>
+  <div class="wrap">
+    <div class="lbl">Industry project · Tecnológico de Monterrey · Feb – Mar 2026</div>
+    <h1 data-es="Sistema de &lt;em&gt;capacitación y auditoría&lt;/em&gt; en ciclo cerrado">Closed-Loop <em>Training &amp; Audit</em> System</h1>
+    <p class="sub">For the field operations of Traffic Light, a public lighting and urban mobility company, we designed a system that links technician skills assessment, training and audits into one continuous-improvement cycle.</p>
+    <div class="meta"><span>José Rodrigo Ramos García</span><span>Industrial &amp; Systems Engineering</span><span>Systemic Project Development</span><span>Team of 4</span></div>
+    <div class="kpis">
+      <div><b>11</b><span>Success KPIs</span></div>
+      <div><b>19</b><span>Competencies in the matrix</span></div>
+      <div><b>4</b><span>Training modules · 31.5 h</span></div>
+      <div class="lit"><b>5</b><span>Rollout phases</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="nav" aria-label="Sections">
+  <div class="wrap">
+    <a href="#context">Context</a><a href="#process">Process</a><a href="#diagnosis">Diagnosis</a><a href="#solution">Solution</a><a href="#matrix">Skills matrix</a><a href="#manual">Manual</a><a href="#rollout">Rollout</a><a href="#impact">Impact</a><a href="#about">My role</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section id="context" aria-labelledby="h-context">
+    <div class="sh"><div class="lbl">01 · Context</div>
+      <h2 id="h-context">From expert experience to an institutional system</h2>
+      <p>Traffic Light designs, installs and maintains public lighting, traffic signals and urban infrastructure for municipalities and private clients, with operations aligned to ISO 9001. Its operations area wanted training and field audits that scale with the business.</p></div>
+    <p class="quote">Turn the know-how of experienced technicians into a <b>structured, measurable system</b> that any trainer can run and every crew benefits from.</p>
+    <div class="grid2">
+      <div class="panel"><h3>Operations in scope</h3>
+        <div class="chips"><span class="chip">Field safety</span><span class="chip">Public lighting O&amp;M</span><span class="chip">Electrical networks</span><span class="chip">Traffic signals</span><span class="chip">Road signage</span><span class="chip">Thermoplastic paint</span><span class="chip">Civil works</span></div></div>
+      <div class="panel"><h3>SMART objective</h3>
+        <p class="muted">Develop an integrated audit and training system for the operations area using Soft Systems Methodology, moving from a reactive model to a closed-loop, continuous-improvement model by the end of the 2026 academic period.</p></div>
+    </div>
+  </section>
+
+  <section id="process" aria-labelledby="h-process">
+    <div class="sh"><div class="lbl">02 · Process</div><h2 id="h-process">Four deliverables in four weeks</h2>
+      <p>We followed Peter Checkland's Soft Systems Methodology, built for situations where the problem is about people, information and processes rather than a single technical fault. The schedule was planned in ProjectLibre.</p></div>
+    <div class="road">
+      <div class="stop"><div class="when">FEB 13 – 17</div><h3>Preliminary formulation</h3><p>Technical interview with the operations team, rich picture of the situation and critical variables.</p></div>
+      <div class="stop"><div class="when">FEB 18 – 19</div><h3>Work plan</h3><p>SMART objective, project charter, Gantt chart and 11 success KPIs.</p></div>
+      <div class="stop"><div class="when">FEB 20 – 25</div><h3>Diagnosis</h3><p>Data-collection tools, document review, affinity and relationship diagrams.</p></div>
+      <div class="stop"><div class="when">FEB 26 – MAR 9</div><h3>Proposal</h3><p>Three alternatives, integrated solution, impact estimate, rollout plan and final presentation.</p></div>
+    </div>
+  </section>
+
+  <section id="diagnosis" aria-labelledby="h-diag">
+    <div class="sh"><div class="lbl">03 · Diagnosis</div><h2 id="h-diag">The missing piece was a feedback loop</h2>
+      <p>The rich picture pointed to one systemic idea: without a feedback loop, field errors tend to repeat; with one, every audit feeds training and the system corrects itself.</p></div>
+    <div class="toggle" role="group" aria-label="Highlight a cycle">
+      <button type="button" data-show="both" aria-pressed="true">Both cycles</button>
+      <button type="button" data-show="bad" aria-pressed="false">Without feedback</button>
+      <button type="button" data-show="good" aria-pressed="false">With the system</button>
+    </div>
+    <div class="loops" id="loops" data-show="both">
+      <div class="loopcard bad">
+        <svg viewBox="0 0 420 400" role="img" aria-label="REACTIVE cycle: Non-systematic audits then Reactive training then Errors, rework &amp; waste then Cost &amp; reputation"><circle class="lp-ring" cx="210" cy="200" r="128"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(300.5,290.5) rotate(135)"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(119.5,290.5) rotate(225)"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(119.5,109.5) rotate(315)"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(300.5,109.5) rotate(405)"/><g class="lp-node"><rect x="136.0" y="46.0" width="148" height="52" rx="10"/><text x="210.0" y="68.0" text-anchor="middle" data-es="Auditorías no">Non-systematic</text><text x="210.0" y="87.0" text-anchor="middle" data-es="sistemáticas">audits</text></g><g class="lp-node"><rect x="264.0" y="174.0" width="148" height="52" rx="10"/><text x="338.0" y="196.0" text-anchor="middle" data-es="Capacitación">Reactive</text><text x="338.0" y="215.0" text-anchor="middle" data-es="reactiva">training</text></g><g class="lp-node"><rect x="136.0" y="302.0" width="148" height="52" rx="10"/><text x="210.0" y="324.0" text-anchor="middle" data-es="Errores, retrabajo">Errors, rework</text><text x="210.0" y="343.0" text-anchor="middle" data-es="y desperdicio">&amp; waste</text></g><g class="lp-node"><rect x="8.0" y="174.0" width="148" height="52" rx="10"/><text x="82.0" y="196.0" text-anchor="middle" data-es="Costo y">Cost &amp;</text><text x="82.0" y="215.0" text-anchor="middle" data-es="reputación">reputation</text></g><g class="orbit"><circle cx="210" cy="72" r="7" fill="var(--c)"/><circle cx="210" cy="72" r="15" fill="var(--c)" fill-opacity=".2"/></g><text class="lp-mid" x="210" y="205" text-anchor="middle" data-es="REACTIVO">REACTIVE</text></svg>
+        <h3>Without a feedback loop</h3><p>Linear and reactive: problems are fixed, not prevented.</p>
+      </div>
+      <div class="core"><div class="bulb">Operational excellence</div><small>Quality · safety<br>competitive in tenders</small></div>
+      <div class="loopcard good">
+        <svg viewBox="0 0 420 400" role="img" aria-label="PREVENTIVE cycle: Digital audits with checklists then Gap detection from KPI data then Focused training then Standards met quality &amp; safety"><circle class="lp-ring" cx="210" cy="200" r="128"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(300.5,290.5) rotate(135)"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(119.5,290.5) rotate(225)"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(119.5,109.5) rotate(315)"/><path class="lp-arrow" d="M-7,-6 L7,0 L-7,6 z" transform="translate(300.5,109.5) rotate(405)"/><g class="lp-node"><rect x="136.0" y="46.0" width="148" height="52" rx="10"/><text x="210.0" y="68.0" text-anchor="middle" data-es="Auditorías digitales">Digital audits</text><text x="210.0" y="87.0" text-anchor="middle" data-es="con checklists">with checklists</text></g><g class="lp-node"><rect x="264.0" y="174.0" width="148" height="52" rx="10"/><text x="338.0" y="196.0" text-anchor="middle" data-es="Detección de">Gap detection</text><text x="338.0" y="215.0" text-anchor="middle" data-es="brechas con KPIs">from KPI data</text></g><g class="lp-node"><rect x="136.0" y="302.0" width="148" height="52" rx="10"/><text x="210.0" y="324.0" text-anchor="middle" data-es="Capacitación">Focused</text><text x="210.0" y="343.0" text-anchor="middle" data-es="enfocada">training</text></g><g class="lp-node"><rect x="8.0" y="174.0" width="148" height="52" rx="10"/><text x="82.0" y="196.0" text-anchor="middle" data-es="Calidad y">Standards met</text><text x="82.0" y="215.0" text-anchor="middle" data-es="seguridad cumplidas">quality &amp; safety</text></g><g class="orbit"><circle cx="210" cy="72" r="7" fill="var(--c)"/><circle cx="210" cy="72" r="15" fill="var(--c)" fill-opacity=".2"/></g><text class="lp-mid" x="210" y="205" text-anchor="middle" data-es="PREVENTIVO">PREVENTIVE</text></svg>
+        <h3>With the proposed system</h3><p>Preventive: data triggers audits, audits drive training.</p>
+      </div>
+    </div>
+    <div class="ctx"><span>Clients: government &amp; private</span><span>Tenders: budget &amp; deadlines</span><span>Large field crews</span><span>Asset &amp; incident data</span><span>Onboarding new staff</span><span>Continuous improvement</span></div>
+
+    <div class="rel">
+      <div class="panel" style="padding:14px">
+        <svg viewBox="0 0 520 384" role="img" aria-labelledby="relt">
+          <title id="relt">Relationship diagram: a structured teaching method drives the competency matrix and evaluation checklist, which feed the audit protocol and the use of operations data, which lead to training-effectiveness KPIs.</title>
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7e89a3"/></marker></defs>
+          <path class="ar" d="M150 74 C 150 110, 100 120, 100 148" marker-end="url(#ah)"/>
+          <path class="ar" d="M290 74 C 290 110, 380 120, 380 148" marker-end="url(#ah)"/>
+          <path class="ar" d="M100 196 C 100 225, 130 240, 140 258" marker-end="url(#ah)"/>
+          <path class="ar" d="M380 196 C 380 225, 360 240, 350 258" marker-end="url(#ah)"/>
+          <path class="ar" d="M200 282 L 282 282" marker-end="url(#ah)"/>
+          <path class="ar" d="M140 306 C 150 320, 200 324, 220 329" marker-end="url(#ah)"/>
+          <path class="ar" d="M350 306 C 340 320, 320 324, 305 329" marker-end="url(#ah)"/>
+          <g><rect class="nd root" x="90" y="22" width="260" height="52" rx="10"/><text class="t" x="220" y="44" text-anchor="middle">Structured teaching method</text><text class="io" x="220" y="62" text-anchor="middle">in 0 · out 2 · ROOT DRIVER</text></g>
+          <g><rect class="nd" x="10" y="148" width="190" height="48" rx="10"/><text class="t" x="105" y="168" text-anchor="middle">Competency matrix</text><text class="io" x="105" y="185" text-anchor="middle">in 1 · out 1</text></g>
+          <g><rect class="nd" x="290" y="148" width="220" height="48" rx="10"/><text class="t" x="400" y="168" text-anchor="middle">Evaluation checklist</text><text class="io" x="400" y="185" text-anchor="middle">in 1 · out 1</text></g>
+          <g><rect class="nd" x="40" y="258" width="160" height="48" rx="10"/><text class="t" x="120" y="278" text-anchor="middle">Audit protocol</text><text class="io" x="120" y="295" text-anchor="middle">in 2 · out 1</text></g>
+          <g><rect class="nd" x="284" y="258" width="196" height="48" rx="10"/><text class="t" x="382" y="278" text-anchor="middle">Use of operations data</text><text class="io" x="382" y="295" text-anchor="middle">in 1 · out 1</text></g>
+          <g><rect class="nd out" x="150" y="330" width="230" height="46" rx="10"/><text class="t" x="265" y="350" text-anchor="middle">Training-effectiveness KPIs</text><text class="io" x="265" y="367" text-anchor="middle">in 2 · out 0 · FINAL EFFECT</text></g>
+        </svg>
+      </div>
+      <div style="display:grid;gap:14px">
+        <div class="panel"><h3>Relationship diagram</h3>
+          <p class="muted">For each pair of factors we asked "does this one cause that one?" and counted causal arrows. The factor with only outgoing arrows was a <b style="color:var(--amber);font-weight:600">structured method to teach</b>: it unlocks the matrix, the checklists and the audits. Effectiveness KPIs only receive arrows, so they measure the result.</p></div>
+        <div class="panel"><h3>Design requirements we derived</h3>
+          <ul><li>A unique ID per inspection, for traceability</li><li>Required fields: auditor, crew, location, date and time</li><li>Photo evidence before, during and after each job</li><li>Each nonconformity as its own record, with owner and deadline</li><li>Audits triggered by operations data, not only perception</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="solution" aria-labelledby="h-sol">
+    <div class="sh"><div class="lbl">04 · Solution</div><h2 id="h-sol">Three alternatives, one integrated system</h2></div>
+    <div class="grid3">
+      <div class="panel alt"><div class="k">ALTERNATIVE A</div><h3>Skills matrix only</h3><p class="muted small">Shows who needs training and in what, but gives no method to close the gaps.</p><div class="v">Diagnosis without treatment</div></div>
+      <div class="panel alt"><div class="k">ALTERNATIVE B</div><h3>Training manual only</h3><p class="muted small">Standardizes how to teach, but risks training people who already know and skipping those who don't.</p><div class="v">Treatment without diagnosis</div></div>
+      <div class="panel alt pick"><span class="badge">SELECTED</span><div class="k">ALTERNATIVE C</div><h3>Matrix + manual as one loop</h3><p class="muted small">The matrix answers "whom and what to train"; the manual answers "how to train well". Checklists feed results back into the matrix.</p><div class="v">Knowledge becomes institutional</div></div>
+    </div>
+    <div class="steps" role="group" aria-label="Loop steps">
+      <button class="step" data-i="0" aria-pressed="true"><span class="k">01 · ASSESS</span><span class="t">Skills matrix</span><span class="q">Where is each technician?</span></button>
+      <button class="step" data-i="1" aria-pressed="false"><span class="k">02 · PRIORITIZE</span><span class="t">Gap detection</span><span class="q">Who needs what first?</span></button>
+      <button class="step" data-i="2" aria-pressed="false"><span class="k">03 · TRAIN</span><span class="t">Training manual</span><span class="q">How do we teach it?</span></button>
+      <button class="step" data-i="3" aria-pressed="false"><span class="k">04 · VERIFY → 01</span><span class="t">Evaluation checklists</span><span class="q">Did it work? Back to the matrix.</span></button>
+    </div>
+    <div class="detail" aria-live="polite"><h3 id="d-t"></h3><p id="d-p"></p></div>
+  </section>
+
+  <section id="matrix" aria-labelledby="h-mx">
+    <div class="sh"><div class="lbl">05 · Interactive · Skills matrix</div><h2 id="h-mx">The competency matrix we designed</h2>
+      <p>19 field competencies in four specialties, rated 1 to 3 for every technician. The matrix computes each person's clearance, the team's mastery index and the training priorities. Click any cell to change its level, or run a training cycle to watch the loop close.</p></div>
+    <div class="mx-top">
+      <div class="signal"><div class="lamps" aria-hidden="true"><i class="r" id="lr"></i><i class="y" id="ly"></i><i class="g" id="lg"></i></div><div><span>System status</span><b id="i-st">—</b></div></div>
+      <div class="ind"><b id="i-dom">0%</b><span>Operational mastery index</span></div>
+      <div class="ind"><b id="i-red">0</b><span>Level-1 ratings</span></div>
+    </div>
+    <div class="mx-tools">
+      <div class="legend"><span><i class="dot d1"></i>1 · Not cleared</span><span><i class="dot d2"></i>2 · In progress</span><span><i class="dot d3"></i>3 · Expert</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="cycle" type="button" style="border-color:var(--amber-line);color:var(--amber)">▶ Run one training cycle</button><button class="btn" id="reset" type="button">Reset example</button></div>
+    </div>
+    <div class="scroll"><table id="mx"><thead></thead><tbody></tbody></table></div>
+    <p class="cyc" id="cyc" aria-live="polite"></p>
+    <p class="note">Example data with fictitious technicians (T-01 to T-08). Competencies and logic come from the team's matrix; no company data.</p>
+    <div class="prio">
+      <div class="panel"><h3>Training needs by competency</h3><div class="bars" id="bars"></div></div>
+      <div class="panel"><h3>What the supervisor reads from it</h3><ul class="plan" id="plan"></ul></div>
+    </div>
+    <div class="levels">
+      <div class="lv a"><h3>1 · Not cleared</h3><p>Does not know the procedure or has never done the task alone.</p><div class="act">→ Urgent training. No field work without full supervision.</div></div>
+      <div class="lv b"><h3>2 · In progress</h3><p>Knows the theory and can do the task, but needs supervision to ensure quality and avoid rework.</p><div class="act">→ Guided practice: 10–20 min sessions on site.</div></div>
+      <div class="lv c"><h3>3 · Expert</h3><p>Masters the task and works autonomously and safely.</p><div class="act">→ Internal instructor for level 1 and 2 peers.</div></div>
+    </div>
+  </section>
+
+  <section id="manual" aria-labelledby="h-man">
+    <div class="sh"><div class="lbl">06 · Training manual</div><h2 id="h-man">A 50+ page program and trainer's guide</h2>
+      <p>Every session follows the same five steps, so any qualified trainer delivers the same content to the same standard.</p></div>
+    <div class="method">
+      <div class="ms"><div class="k">1</div><h3>Explain</h3><p>The goal and why the skill matters, with real field examples.</p></div>
+      <div class="ms"><div class="k">2</div><h3>Demonstrate</h3><p>The trainer does the task, pointing out critical points and common errors.</p></div>
+      <div class="ms"><div class="k">3</div><h3>Practice together</h3><p>Participants try it while the trainer guides and corrects on the spot.</p></div>
+      <div class="ms"><div class="k">4</div><h3>Evaluate</h3><p>Each person does it alone and is rated with the module checklist.</p></div>
+      <div class="ms"><div class="k">5</div><h3>Feedback</h3><p>Strengths, areas to improve and extra practice if needed.</p></div>
+    </div>
+    <h3 style="font-size:20px;margin:40px 0 4px">Technical modules</h3>
+    <p class="muted small">Select a module to see its units and suggested hours.</p>
+    <div class="mods" id="mods"></div>
+    <div class="grid3" style="margin-top:18px">
+      <div class="panel"><h3>Evaluation</h3><p class="muted small">Diagnostic, practical and final evaluations with a three-level checklist: does it correctly alone, does it with help, does not do it. Trainees rate each session in an anonymous survey.</p></div>
+      <div class="panel"><h3>Standards &amp; safety</h3><div class="chips"><span class="chip">NOM-001-SEDE-2012</span><span class="chip">NOM-029-STPS-2011</span><span class="chip">NOM-017-STPS-2008</span><span class="chip">NOM-031-STPS-2011</span><span class="chip">NOM-030-ENER-2012</span><span class="chip">PPE protocols</span></div></div>
+      <div class="panel"><h3>Beyond the modules</h3><p class="muted small">Strategic courses (design thinking, project management, continuous improvement), three field case studies, a glossary, practice logs and a post-training follow-up plan.</p></div>
+    </div>
+  </section>
+
+  <section id="rollout" aria-labelledby="h-roll">
+    <div class="sh"><div class="lbl">07 · Implementation plan</div><h2 id="h-roll">Rollout in five phases</h2>
+      <p>A pilot with 10–15 technicians tests the method before scaling. Target: at least 70% of the pilot group improves by one level or more.</p></div>
+    <div class="gantt" role="img" aria-label="Gantt chart: preparation weeks 1-2, baseline diagnosis weeks 3-4, pilot weeks 5-8, scale-up weeks 9-16, consolidation from week 17.">
+      <div class="gr"><div class="nm"><b>Preparation</b><span>Approval, matrix setup, formats</span></div><div class="gt"><i style="left:0;width:10%">W1–2</i></div></div>
+      <div class="gr"><div class="nm"><b>Baseline diagnosis</b><span>Checklists for all technicians</span></div><div class="gt"><i style="left:10%;width:10%">W3–4</i></div></div>
+      <div class="gr"><div class="nm"><b>Pilot</b><span>Module 1 with the pilot group</span></div><div class="gt"><i class="pilot" style="left:20%;width:20%">W5–8 · pilot</i></div></div>
+      <div class="gr"><div class="nm"><b>Scale-up</b><span>All modules, internal instructors</span></div><div class="gt"><i style="left:40%;width:40%">W9–16</i></div></div>
+      <div class="gr"><div class="nm"><b>Consolidation</b><span>Quarterly refreshers, monthly reviews</span></div><div class="gt"><i style="left:80%;width:20%;opacity:.7">W17 →</i></div></div>
+      <div class="gaxis"><div></div><div><span>W1</span><span>W5</span><span>W9</span><span>W13</span><span>W17</span><span>W20</span></div></div>
+    </div>
+    <h3 style="font-size:20px;margin:44px 0 14px">How success is measured · 11 KPIs</h3>
+    <div class="grid3">
+      <div class="panel kg"><h3><i class="dot" style="background:var(--led)"></i>Audit system</h3><ol><li data-es="Auditorías &lt;b&gt;programadas&lt;/b&gt; completadas"><b>Scheduled audits</b> completed</li><li data-es="&lt;b&gt;No conformidades&lt;/b&gt; por tipo de trabajo"><b>Nonconformities</b> by type of work</li><li data-es="&lt;b&gt;Tiempo de cierre&lt;/b&gt; de no conformidades"><b>Time to close</b> nonconformities</li><li data-es="&lt;b&gt;Auditorías activadas&lt;/b&gt; por datos"><b>Audits triggered</b> by data</li></ol></div>
+      <div class="panel kg"><h3><i class="dot" style="background:var(--amber)"></i>Training system</h3><ol><li data-es="&lt;b&gt;Cobertura de la matriz&lt;/b&gt; en el personal"><b>Matrix coverage</b> of staff</li><li data-es="&lt;b&gt;Brecha de competencias&lt;/b&gt;"><b>Competency gap</b></li><li data-es="Cumplimiento del &lt;b&gt;plan de capacitación&lt;/b&gt;"><b>Training plan</b> compliance</li><li data-es="&lt;b&gt;Efectividad&lt;/b&gt; en campo"><b>Effectiveness</b> in the field</li></ol></div>
+      <div class="panel kg"><h3><i class="dot" style="background:var(--grn)"></i>Operational impact</h3><ol><li data-es="Reducción de &lt;b&gt;retrabajos&lt;/b&gt;"><b>Rework</b> reduction</li><li data-es="Cumplimiento del contrato en &lt;b&gt;primera revisión&lt;/b&gt;"><b>First-review</b> contract compliance</li><li data-es="&lt;b&gt;Incidentes&lt;/b&gt; reportados desde operaciones"><b>Incidents</b> reported from operations</li></ol></div>
+    </div>
+    <div class="risks">
+      <div><b>Change resistance</b><p>Present evaluations as development and involve staff in validating the tools.</p></div>
+      <div><b>Trainer workload</b><p>Start with micro-trainings and grow internal instructors fast.</p></div>
+      <div><b>Data quality</b><p>Train checklist users, spot-check records, move formats to digital.</p></div>
+      <div><b>Staff turnover</b><p>Build evaluation and training into onboarding; the manual keeps the knowledge.</p></div>
+    </div>
+  </section>
+
+  <section id="impact" aria-labelledby="h-imp">
+    <div class="sh"><div class="lbl">08 · Interactive · Estimated impact</div><h2 id="h-imp">Where the savings come from</h2>
+      <p>The team estimated savings from sector references and stated assumptions. Here they are shown as a cost index, with no company figures. Move the sliders to test other reduction rates.</p></div>
+    <div class="calc">
+      <div class="panel">
+        <div class="crow"><div class="top"><b>Less rework</b><output id="o1"></output></div><div class="f">Illustrative weight: 50 of 100 cost points</div><label for="r1">Reduction <input type="range" id="r1" min="0" max="40" value="15"><span class="pct" id="p1"></span></label></div>
+        <div class="crow"><div class="top"><b>Less material waste</b><output id="o2"></output></div><div class="f">Illustrative weight: 35 of 100 cost points (cable, paint, connectors, parts)</div><label for="r2">Reduction <input type="range" id="r2" min="0" max="25" value="10"><span class="pct" id="p2"></span></label></div>
+        <div class="crow"><div class="top"><b>Fewer extra supervisions</b><output id="o3"></output></div><div class="f">Illustrative weight: 15 of 100 cost points</div><label for="r3">Reduction <input type="range" id="r3" min="0" max="60" value="30"><span class="pct" id="p3"></span></label></div>
+        <button class="btn" id="calc-reset" type="button" style="margin-top:10px">Back to project values</button>
+      </div>
+      <div class="total" aria-live="polite">
+        <span>Estimated cost reduction*</span><b id="tot"></b>
+        <div class="stack"><i id="s1" style="background:var(--amber)"></i><i id="s2" style="background:var(--led)"></i><i id="s3" style="background:var(--grn)"></i></div>
+        <div class="split"><div><span><i class="dot" style="background:var(--amber);margin-right:7px"></i>Rework</span><em id="e1"></em></div><div><span><i class="dot" style="background:var(--led);margin-right:7px"></i>Material waste</span><em id="e2"></em></div><div><span><i class="dot" style="background:var(--grn);margin-right:7px"></i>Supervision</span><em id="e3"></em></div></div>
+        <p class="note" style="margin-top:16px">*Illustrative model: costs are an index of 100 points, not company figures. Reduction rates are team assumptions from sector references, not measured results. Project values 15% · 10% · 30% → 15.5% lower cost.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="about" aria-labelledby="h-about">
+    <div class="sh"><div class="lbl">09 · Outcome</div><h2 id="h-about">Recognition and my role</h2></div>
+    <div class="closing">
+      <div class="rec"><div class="lbl">★ Recognition</div><p>Recognized by Traffic Light's leadership for outstanding abstraction, analysis and strategic vision in the project.</p></div>
+      <div class="panel"><h3>My contribution</h3><p class="muted">Built the Excel competency matrix behind the interactive example above, with clearance status, mastery index and training-needs tables. Designed the competency evaluation checklists and the training tables, and wrote the manual's evaluation section. Also refined the diagnosis report.</p>
+        <div class="chips" style="margin-top:14px"><span class="chip">Soft Systems Methodology</span><span class="chip">Excel</span><span class="chip">Competency evaluation</span><span class="chip">Checklists</span><span class="chip">KPIs</span><span class="chip">ProjectLibre</span><span class="chip">ISO 9001</span></div></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><a href="../" style="color:inherit">← Back to portfolio</a><span>Academic project · Tecnológico de Monterrey · 2026 · No confidential company data included</span><span>José Rodrigo Ramos García · Industrial &amp; Systems Engineering</span></div></footer>
+
+<script>window.__TC=["#070a12", "#f5f3ee"];
+(function(){var R=document.documentElement,b=document.getElementById("thm"),m=document.querySelector('meta[name="theme-color"]'),M=window.__CMAP;
+  if(M){var keep=window.__CKEEP||".hero";
+    function tc(cv,v){if(typeof v!=="string"||R.getAttribute("data-theme")!=="light"||(cv&&cv.closest&&cv.closest(keep)))return v;
+      var k=v.toLowerCase();if(M.hex[k])return M.hex[k];
+      return v.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/,function(s,r,g,bb){var q=r+","+g+","+bb;return M.rgb[q]?s.replace(/\d+\s*,\s*\d+\s*,\s*\d+/,M.rgb[q]):s;});}
+    var P=CanvasRenderingContext2D.prototype;["fillStyle","strokeStyle","shadowColor"].forEach(function(p){var d=Object.getOwnPropertyDescriptor(P,p);
+      Object.defineProperty(P,p,{configurable:true,get:d.get,set:function(v){d.set.call(this,tc(this.canvas,v));}});});
+    var ag=CanvasGradient.prototype.addColorStop;window.__gcv=null;
+    var cl=P.createLinearGradient,cr=P.createRadialGradient;
+    P.createLinearGradient=function(){var g=cl.apply(this,arguments);g.__cv=this.canvas;return g;};
+    P.createRadialGradient=function(){var g=cr.apply(this,arguments);g.__cv=this.canvas;return g;};
+    CanvasGradient.prototype.addColorStop=function(o,c){return ag.call(this,o,tc(this.__cv,c));};}
+  function set(t){R.setAttribute("data-theme",t);try{localStorage.setItem("theme",t)}catch(e){}
+    b.setAttribute("aria-label",t==="dark"?"Switch to light mode":"Switch to dark mode");
+    if(m)m.setAttribute("content",t==="dark"?window.__TC[0]:window.__TC[1]);
+    document.dispatchEvent(new Event("themechange"));}
+  b.addEventListener("click",function(){set(R.getAttribute("data-theme")==="dark"?"light":"dark");});
+  set(R.getAttribute("data-theme")||"dark");})();
+
+(function(){if(!("IntersectionObserver" in window))return;
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){var on=e.isIntersecting;e.target.classList.toggle("off",!on);
+    [].forEach.call(e.target.querySelectorAll("svg"),function(s){if(s.pauseAnimations){on?s.unpauseAnimations():s.pauseAnimations();}});});},{rootMargin:"120px"});
+  [].forEach.call(document.querySelectorAll(".hero,main section,body > section"),function(x){io.observe(x);});})();
+</script>
+<script>window.__I18N={D:{"Portfolio": "Portafolio", "Index": "Índice", "Top": "Inicio", "Industry project · Tecnológico de Monterrey · Feb – Mar 2026": "Proyecto con empresa · Tecnológico de Monterrey · feb – mar 2026", "For the field operations of Traffic Light, a public lighting and urban mobility company, we designed a system that links technician skills assessment, training and audits into one continuous-improvement cycle.": "Para las operaciones de campo de Traffic Light, empresa de alumbrado público y movilidad urbana, diseñamos un sistema que une la evaluación de habilidades de los técnicos, la capacitación y las auditorías en un solo ciclo de mejora continua.", "Industrial & Systems Engineering": "Ingeniería Industrial y de Sistemas", "Systemic Project Development": "Desarrollo de Proyectos Sistémicos", "Team of 4": "Equipo de 4", "Competencies in the matrix": "Competencias en la matriz", "Training modules · 31.5 h": "Módulos de capacitación · 31.5 h", "Context": "Contexto", "Process": "Proceso", "Diagnosis": "Diagnóstico", "Solution": "Solución", "Skills matrix": "Matriz de habilidades", "Manual": "Manual", "Rollout": "Implementación", "Impact": "Impacto", "My role": "Mi rol", "01 · Context": "01 · Contexto", "From expert experience to an institutional system": "De la experiencia de los expertos a un sistema institucional", "Traffic Light designs, installs and maintains public lighting, traffic signals and urban infrastructure for municipalities and private clients, with operations aligned to ISO 9001. Its operations area wanted training and field audits that scale with the business.": "Traffic Light diseña, instala y mantiene alumbrado público, semáforos e infraestructura urbana para municipios y clientes privados, con operaciones alineadas a ISO 9001. Su área de operaciones buscaba una capacitación y unas auditorías de campo que crecieran con el negocio.", "Turn the know-how of experienced technicians into a": "Convertir el conocimiento de los técnicos con experiencia en un", "structured, measurable system": "sistema estructurado y medible", "that any trainer can run and every crew benefits from.": "que cualquier capacitador pueda aplicar y que beneficie a cada cuadrilla.", "Operations in scope": "Operaciones en el alcance", "Field safety": "Seguridad en campo", "Public lighting O&M": "Operación y mantenimiento de alumbrado", "Electrical networks": "Redes eléctricas", "Traffic signals": "Semáforos", "Road signage": "Señalización vial", "Thermoplastic paint": "Pintura termoplástica", "Civil works": "Obra civil", "SMART objective": "Objetivo SMART", "Develop an integrated audit and training system for the operations area using Soft Systems Methodology, moving from a reactive model to a closed-loop, continuous-improvement model by the end of the 2026 academic period.": "Desarrollar un sistema integrado de auditoría y capacitación para el área de operaciones con la Metodología de Sistemas Suaves, para pasar de un modelo reactivo a uno de ciclo cerrado y mejora continua al cierre del periodo académico 2026.", "02 · Process": "02 · Proceso", "Four deliverables in four weeks": "Cuatro entregables en cuatro semanas", "We followed Peter Checkland's Soft Systems Methodology, built for situations where the problem is about people, information and processes rather than a single technical fault. The schedule was planned in ProjectLibre.": "Seguimos la Metodología de Sistemas Suaves de Peter Checkland, pensada para situaciones donde el problema tiene que ver con personas, información y procesos, más que con una sola falla técnica. El cronograma se planeó en ProjectLibre.", "FEB 13 – 17": "13 – 17 FEB", "FEB 18 – 19": "18 – 19 FEB", "FEB 20 – 25": "20 – 25 FEB", "FEB 26 – MAR 9": "26 FEB – 9 MAR", "Preliminary formulation": "Formulación preliminar", "Technical interview with the operations team, rich picture of the situation and critical variables.": "Entrevista técnica con el equipo de operaciones, imagen enriquecida de la situación y variables críticas.", "Work plan": "Plan de trabajo", "SMART objective, project charter, Gantt chart and 11 success KPIs.": "Objetivo SMART, project charter, diagrama de Gantt y 11 KPIs de éxito.", "Data-collection tools, document review, affinity and relationship diagrams.": "Herramientas de recolección de datos, revisión documental, diagramas de afinidad y de relaciones.", "Proposal": "Propuesta", "Three alternatives, integrated solution, impact estimate, rollout plan and final presentation.": "Tres alternativas, solución integrada, estimación de impacto, plan de implementación y presentación final.", "03 · Diagnosis": "03 · Diagnóstico", "The missing piece was a feedback loop": "La pieza faltante era un ciclo de retroalimentación", "Both cycles": "Ambos ciclos", "Without feedback": "Sin retroalimentación", "With the system": "Con el sistema", "Without a feedback loop": "Sin ciclo de retroalimentación", "Linear and reactive: problems are fixed, not prevented.": "Lineal y reactivo: los problemas se corrigen, no se previenen.", "Operational excellence": "Excelencia operativa", "Quality · safety": "Calidad · seguridad", "competitive in tenders": "competitiva en licitaciones", "With the proposed system": "Con el sistema propuesto", "Preventive: data triggers audits, audits drive training.": "Preventivo: los datos activan auditorías y las auditorías guían la capacitación.", "Clients: government & private": "Clientes: gobierno y privados", "Tenders: budget & deadlines": "Licitaciones: presupuesto y plazos", "Asset & incident data": "Datos de activos e incidentes", "Staff turnover": "Rotación de personal", "Continuous improvement": "Mejora continua", "Relationship diagram: a structured teaching method drives the competency matrix and evaluation checklist, which feed the audit protocol and the use of operations data, which lead to training-effectiveness KPIs.": "Diagrama de relaciones: un método de enseñanza estructurado impulsa la matriz de competencias y el checklist de evaluación, que alimentan el protocolo de auditoría y el uso de datos de operación, que llevan a los KPIs de efectividad de la capacitación.", "Structured teaching method": "Método de enseñanza estructurado", "in 0 · out 2 · ROOT DRIVER": "entran 0 · salen 2 · CAUSA RAÍZ", "Competency matrix": "Matriz de competencias", "in 1 · out 1": "entra 1 · sale 1", "Evaluation checklist": "Checklist de evaluación", "Audit protocol": "Protocolo de auditoría", "in 2 · out 1": "entran 2 · sale 1", "Use of operations data": "Uso de datos de operación", "Training-effectiveness KPIs": "KPIs de efectividad de la capacitación", "in 2 · out 0 · FINAL EFFECT": "entran 2 · salen 0 · EFECTO FINAL", "Relationship diagram": "Diagrama de relaciones", "For each pair of factors we asked \"does this one cause that one?\" and counted causal arrows. The factor with only outgoing arrows was a": "Para cada par de factores preguntamos \"¿este causa aquel?\" y contamos las flechas causales. El factor con solo flechas de salida fue un", "structured method to teach": "método estructurado para enseñar", ": it unlocks the matrix, the checklists and the audits. Effectiveness KPIs only receive arrows, so they measure the result.": ": desbloquea la matriz, los checklists y las auditorías. Los KPIs de efectividad solo reciben flechas, así que miden el resultado.", "Design requirements we derived": "Requisitos de diseño que derivamos", "A unique ID per inspection, for traceability": "Un ID único por inspección, para trazabilidad", "Required fields: auditor, crew, location, date and time": "Campos obligatorios: auditor, cuadrilla, ubicación, fecha y hora", "Photo evidence before, during and after each job": "Evidencia fotográfica antes, durante y después de cada trabajo", "Each nonconformity as its own record, with owner and deadline": "Cada no conformidad como registro propio, con responsable y fecha límite", "Audits triggered by operations data, not only perception": "Auditorías activadas por datos de operación, no solo por percepción", "04 · Solution": "04 · Solución", "Three alternatives, one integrated system": "Tres alternativas, un sistema integrado", "ALTERNATIVE A": "ALTERNATIVA A", "Skills matrix only": "Solo matriz de habilidades", "Shows who needs training and in what, but gives no method to close the gaps.": "Muestra quién necesita capacitación y en qué, pero no da un método para cerrar las brechas.", "Diagnosis without treatment": "Diagnóstico sin tratamiento", "ALTERNATIVE B": "ALTERNATIVA B", "Training manual only": "Solo manual de capacitación", "Standardizes how to teach, but risks training people who already know and skipping those who don't.": "Estandariza cómo enseñar, pero corre el riesgo de capacitar a quien ya sabe y omitir a quien no.", "Treatment without diagnosis": "Tratamiento sin diagnóstico", "SELECTED": "SELECCIONADA", "ALTERNATIVE C": "ALTERNATIVA C", "Matrix + manual as one loop": "Matriz + manual en un solo ciclo", "The matrix answers \"whom and what to train\"; the manual answers \"how to train well\". Checklists feed results back into the matrix.": "La matriz responde \"a quién y qué capacitar\"; el manual responde \"cómo capacitar bien\". Los checklists regresan los resultados a la matriz.", "Knowledge becomes institutional": "El conocimiento se vuelve institucional", "01 · ASSESS": "01 · EVALUAR", "Where is each technician?": "¿Dónde está cada técnico?", "02 · PRIORITIZE": "02 · PRIORIZAR", "Who needs what first?": "¿Quién necesita qué primero?", "03 · TRAIN": "03 · CAPACITAR", "Training manual": "Manual de capacitación", "How do we teach it?": "¿Cómo lo enseñamos?", "04 · VERIFY → 01": "04 · VERIFICAR → 01", "Evaluation checklists": "Checklists de evaluación", "Did it work? Back to the matrix.": "¿Funcionó? De vuelta a la matriz.", "Gap detection": "Detección de brechas", "Every technician is rated in 19 field competencies on a three-level color scale. The supervisor sees each crew's real skill level and who is cleared for each critical activity.": "Cada técnico se califica en 19 competencias de campo con una escala de tres colores. El supervisor ve el nivel real de cada cuadrilla y quién está habilitado para cada actividad crítica.", "Red cells flag urgent needs by competency and crew. High priority: level 1 in critical skills. Medium: level 2 ready to reach 3. Level 3 technicians become candidate instructors.": "Las celdas rojas marcan necesidades urgentes por competencia y cuadrilla. Prioridad alta: nivel 1 en habilidades críticas. Media: nivel 2 listo para llegar a 3. Los técnicos de nivel 3 se vuelven candidatos a instructores.", "Each priority maps to a module of the manual, taught with the five-step method: explain, demonstrate, practice together, evaluate and give feedback.": "Cada prioridad corresponde a un módulo del manual, impartido con el método de cinco pasos: explicar, demostrar, practicar juntos, evaluar y retroalimentar.", "After training, the module checklist rates the technician again. The new level updates the matrix, priorities change and the cycle restarts.": "Después de la capacitación, el checklist del módulo vuelve a calificar al técnico. El nuevo nivel actualiza la matriz, las prioridades cambian y el ciclo vuelve a empezar.", "05 · Interactive · Skills matrix": "05 · Interactivo · Matriz de habilidades", "The competency matrix we designed": "La matriz de competencias que diseñamos", "19 field competencies in four specialties, rated 1 to 3 for every technician. The matrix computes each person's clearance, the team's mastery index and the training priorities. Click any cell to change its level, or run a training cycle to watch the loop close.": "19 competencias de campo en cuatro especialidades, calificadas de 1 a 3 para cada técnico. La matriz calcula la habilitación de cada persona, el índice de dominio del equipo y las prioridades de capacitación. Haz clic en cualquier celda para cambiar su nivel, o corre un ciclo de capacitación para ver cómo se cierra el ciclo.", "System status": "Estado del sistema", "Stop and train": "Detener y capacitar", "Targeted training": "Capacitación focalizada", "Stable · keep auditing": "Estable · seguir auditando", "Operational mastery index": "Índice de dominio operativo", "Level-1 ratings": "Calificaciones de nivel 1", "1 · Not cleared": "1 · No habilitado", "2 · In progress": "2 · En progreso", "3 · Expert": "3 · Experto", "▶ Run one training cycle": "▶ Correr un ciclo de capacitación", "Reset example": "Reiniciar ejemplo", "Luminaire maintenance": "Mantenimiento de luminarias", "Electrical network": "Red eléctrica", "Mobility & civil works": "Movilidad y obra civil", "Records & quality": "Registros y calidad", "Technician": "Técnico", "Clearance": "Habilitación", "Crew A": "Cuadrilla A", "Crew B": "Cuadrilla B", "Crew C": "Cuadrilla C", "Retrain before field work": "Recapacitar antes de ir a campo", "Cleared under supervision": "Habilitado con supervisión", "Cleared to work alone": "Habilitado para trabajar solo", "Example data with fictitious technicians (T-01 to T-08). Competencies and logic come from the team's matrix; no company data.": "Datos de ejemplo con técnicos ficticios (T-01 a T-08). Las competencias y la lógica vienen de la matriz del equipo; sin datos de la empresa.", "Training needs by competency": "Necesidades de capacitación por competencia", "What the supervisor reads from it": "Lo que el supervisor lee en ella", "Train first:": "Capacitar primero:", "none yet, so the lead trainer covers it.": "ninguno aún, así que lo cubre el capacitador principal.", "Pilot group candidates:": "Candidatos para el grupo piloto:", "none.": "ninguno.", "Crew to audit next:": "Siguiente cuadrilla a auditar:", "No level-1 ratings. Every competency is covered.": "Sin calificaciones de nivel 1. Todas las competencias están cubiertas.", "Every technician is an expert in every competency. The loop keeps auditing to hold the level.": "Cada técnico es experto en todas las competencias. El ciclo sigue auditando para mantener el nivel.", "Does not know the procedure or has never done the task alone.": "No conoce el procedimiento o nunca ha hecho la tarea solo.", "→ Urgent training. No field work without full supervision.": "→ Capacitación urgente. Nada de trabajo de campo sin supervisión completa.", "Knows the theory and can do the task, but needs supervision to ensure quality and avoid rework.": "Conoce la teoría y puede hacer la tarea, pero necesita supervisión para asegurar la calidad y evitar retrabajos.", "→ Guided practice: 10–20 min sessions on site.": "→ Práctica guiada: sesiones de 10–20 min en sitio.", "Masters the task and works autonomously and safely.": "Domina la tarea y trabaja de forma autónoma y segura.", "→ Internal instructor for level 1 and 2 peers.": "→ Instructor interno para compañeros de nivel 1 y 2.", "06 · Training manual": "06 · Manual de capacitación", "A 50+ page program and trainer's guide": "Un programa de más de 50 páginas y guía del capacitador", "Every session follows the same five steps, so any qualified trainer delivers the same content to the same standard.": "Cada sesión sigue los mismos cinco pasos, así cualquier capacitador calificado imparte el mismo contenido con el mismo estándar.", "Explain": "Explicar", "The goal and why the skill matters, with real field examples.": "El objetivo y por qué importa la habilidad, con ejemplos reales de campo.", "Demonstrate": "Demostrar", "The trainer does the task, pointing out critical points and common errors.": "El capacitador hace la tarea y señala los puntos críticos y los errores comunes.", "Practice together": "Practicar juntos", "Participants try it while the trainer guides and corrects on the spot.": "Los participantes lo intentan mientras el capacitador guía y corrige al momento.", "Evaluate": "Evaluar", "Each person does it alone and is rated with the module checklist.": "Cada persona lo hace sola y se califica con el checklist del módulo.", "Feedback": "Retroalimentar", "Strengths, areas to improve and extra practice if needed.": "Fortalezas, áreas de mejora y práctica extra si hace falta.", "Technical modules": "Módulos técnicos", "Select a module to see its units and suggested hours.": "Selecciona un módulo para ver sus unidades y horas sugeridas.", "LED luminaire installation": "Instalación de luminarias LED", "Cable selection and verification": "Selección y verificación de cable", "Bimetallic and H-type connectors": "Conectores bimetálicos y tipo H", "Ballast, starter and capacitor connection": "Conexión de balastro, arrancador y capacitor", "Photocells and shorting caps": "Fotoceldas y capuchones de corto", "Voltage and operation checks": "Verificación de voltaje y funcionamiento", "Practical evaluation": "Evaluación práctica", "Preventive luminaire maintenance": "Mantenimiento preventivo de luminarias", "Optical group and diffuser cleaning": "Limpieza de conjunto óptico y difusor", "Lubrication of moving parts": "Lubricación de partes móviles", "Connection check and terminal tightening": "Revisión de conexiones y apriete de terminales", "Operation check and measurements": "Verificación de funcionamiento y mediciones", "Work-site cleanup": "Limpieza del área de trabajo", "Electrical network maintenance": "Mantenimiento de red eléctrica", "Aerial cabling (racks, brackets)": "Cableado aéreo (bastidores, ménsulas)", "Continuity and insulation tests": "Pruebas de continuidad y aislamiento", "Cabinets and photocontrols": "Gabinetes y fotocontroles", "Junction boxes (cleaning, covers, connections)": "Registros (limpieza, tapas, conexiones)", "Tapes and connectors in junction boxes": "Cintas y conectores en registros", "Corrective maintenance (repairs)": "Mantenimiento correctivo (reparaciones)", "Fault diagnosis method": "Método de diagnóstico de fallas", "Root cause vs. symptoms": "Causa raíz vs. síntomas", "Selecting and replacing parts": "Selección y reemplazo de piezas", "Permanent repair techniques": "Técnicas de reparación definitiva", "Verification and testing": "Verificación y pruebas", "Evaluation": "Evaluación", "Diagnostic, practical and final evaluations with a three-level checklist: does it correctly alone, does it with help, does not do it. Trainees rate each session in an anonymous survey.": "Evaluaciones diagnóstica, práctica y final con un checklist de tres niveles: lo hace bien solo, lo hace con ayuda, no lo hace. Los participantes califican cada sesión en una encuesta anónima.", "Standards & safety": "Normas y seguridad", "PPE protocols": "Protocolos de EPP", "Beyond the modules": "Más allá de los módulos", "Strategic courses (design thinking, project management, continuous improvement), three field case studies, a glossary, practice logs and a post-training follow-up plan.": "Cursos estratégicos (design thinking, gestión de proyectos, mejora continua), tres casos de estudio de campo, un glosario, bitácoras de práctica y un plan de seguimiento posterior a la capacitación.", "07 · Implementation plan": "07 · Plan de implementación", "Rollout in five phases": "Implementación en cinco fases", "A pilot with 10–15 technicians tests the method before scaling. Target: at least 70% of the pilot group improves by one level or more.": "Un piloto con 10–15 técnicos prueba el método antes de escalar. Meta: que al menos el 70% del grupo piloto suba uno o más niveles.", "Preparation": "Preparación", "Approval, matrix setup, formats": "Aprobación, configuración de la matriz, formatos", "Baseline diagnosis": "Diagnóstico base", "Checklists for all technicians": "Checklists para todos los técnicos", "Pilot": "Piloto", "Module 1 with the pilot group": "Módulo 1 con el grupo piloto", "W5–8 · pilot": "S5–8 · piloto", "Scale-up": "Escalamiento", "All modules, internal instructors": "Todos los módulos, instructores internos", "Consolidation": "Consolidación", "Quarterly refreshers, monthly reviews": "Repasos trimestrales, revisiones mensuales", "How success is measured · 11 KPIs": "Cómo se mide el éxito · 11 KPIs", "Audit system": "Sistema de auditoría", "Training system": "Sistema de capacitación", "Operational impact": "Impacto operativo", "Change resistance": "Resistencia al cambio", "Present evaluations as development and involve staff in validating the tools.": "Presentar las evaluaciones como desarrollo e involucrar al personal en validar las herramientas.", "Trainer workload": "Carga de los capacitadores", "Start with micro-trainings and grow internal instructors fast.": "Empezar con microcapacitaciones y formar instructores internos rápido.", "Data quality": "Calidad de los datos", "Train checklist users, spot-check records, move formats to digital.": "Capacitar a quienes usan los checklists, revisar registros al azar y pasar los formatos a digital.", "Build evaluation and training into onboarding; the manual keeps the knowledge.": "Integrar la evaluación y la capacitación a la inducción; el manual conserva el conocimiento.", "08 · Interactive · Estimated impact": "08 · Interactivo · Impacto estimado", "Where the savings come from": "De dónde vienen los ahorros", "The team estimated annual savings from sector references and stated assumptions. Move the sliders to test other reduction rates.": "El equipo estimó los ahorros anuales con referencias del sector y supuestos explícitos. Mueve los controles para probar otras tasas de reducción.", "Less rework": "Menos retrabajo", "Reduction": "Reducción", "Less material waste": "Menos desperdicio de material", "Fewer extra supervisions": "Menos supervisiones extra", "Back to project values": "Volver a los valores del proyecto", "Rework": "Retrabajo", "Material waste": "Desperdicio de material", "Supervision": "Supervisión", "09 · Outcome": "09 · Resultado", "Recognition and my role": "Reconocimiento y mi rol", "★ Recognition": "★ Reconocimiento", "Recognized by Traffic Light's leadership for outstanding abstraction, analysis and strategic vision in the project.": "Reconocido por la dirección de Traffic Light por una capacidad sobresaliente de abstracción, análisis y visión estratégica en el proyecto.", "My contribution": "Mi contribución", "Built the Excel competency matrix behind the interactive example above, with clearance status, mastery index and training-needs tables. Designed the competency evaluation checklists and the training tables, and wrote the manual's evaluation section. Also refined the diagnosis report.": "Construí en Excel la matriz de competencias que está detrás del ejemplo interactivo de arriba, con estado de habilitación, índice de dominio y tablas de necesidades de capacitación. Diseñé los checklists de evaluación de competencias y las tablas de capacitación, y escribí la sección de evaluación del manual. También pulí el reporte de diagnóstico.", "Soft Systems Methodology": "Metodología de Sistemas Suaves", "Competency evaluation": "Evaluación de competencias", "← Back to portfolio": "← Volver al portafolio", "Academic project · Tecnológico de Monterrey · 2026 · No confidential company data included": "Proyecto académico · Tecnológico de Monterrey · 2026 · No incluye datos confidenciales de la empresa", "José Rodrigo Ramos García · Industrial & Systems Engineering": "José Rodrigo Ramos García · Ingeniería Industrial y de Sistemas", "Back to portfolio home": "Volver al inicio del portafolio", "Sections": "Secciones", "Highlight a cycle": "Resaltar un ciclo", "Loop steps": "Pasos del ciclo", "REACTIVE cycle: Non-systematic audits then Reactive training then Errors, rework & waste then Cost & reputation": "Ciclo REACTIVO: auditorías no sistemáticas, luego capacitación reactiva, luego errores, retrabajo y desperdicio, luego costo y reputación", "PREVENTIVE cycle: Digital audits with checklists then Gap detection from KPI data then Focused training then Standards met quality & safety": "Ciclo PREVENTIVO: auditorías digitales con checklists, luego detección de brechas con datos de KPIs, luego capacitación enfocada, luego estándares cumplidos de calidad y seguridad", "Gantt chart: preparation weeks 1-2, baseline diagnosis weeks 3-4, pilot weeks 5-8, scale-up weeks 9-16, consolidation from week 17.": "Diagrama de Gantt: preparación semanas 1-2, diagnóstico base semanas 3-4, piloto semanas 5-8, escalamiento semanas 9-16, consolidación desde la semana 17.", "Cable selection (underground / aerial)": "Selección de cable (subterráneo / aéreo)", "Bimetallic connectors in luminaires": "Conectores bimetálicos en luminarias", "Wiring inside arm / pole": "Cableado en brazo / poste", "Tape application (rubber / vinyl)": "Aplicación de cinta (de hule / vinil)", "Ballast, starter & capacitor wiring": "Conexión de balastro, arrancador y capacitor", "Aerial rack & catenary tension": "Bastidor aéreo y tensión de catenaria", "Continuity & short-circuit tests": "Pruebas de continuidad y cortocircuito", "Photocontrol maintenance": "Mantenimiento de fotocontroles", "Insulation resistance test (megger)": "Prueba de resistencia de aislamiento (megger)", "Junction box maintenance": "Mantenimiento de registros", "Conduit verification": "Verificación de ductos", "Compression bimetallic taps": "Derivaciones bimetálicas a compresión", "Traffic signal sync & programming": "Sincronización y programación de semáforos", "Seasonal & decorative lighting": "Iluminación decorativa y de temporada", "Pole foundations & civil works": "Cimentación de postes y obra civil", "Vertical signage hardware": "Herrajes de señalización vertical", "Asset management app": "App de gestión de activos", "Photo evidence (before/during/after)": "Evidencia fotográfica (antes/durante/después)", "Nonconformity logging": "Registro de no conformidades", "Switch to light mode": "Cambiar a modo claro", "Switch to dark mode": "Cambiar a modo oscuro", "Success KPIs": "KPIs de éxito", "Rollout phases": "Fases de implementación", "The rich picture pointed to one systemic idea: without a feedback loop, field errors tend to repeat; with one, every audit feeds training and the system corrects itself.": "La imagen enriquecida apuntó a una idea sistémica: sin un ciclo de retroalimentación, los errores de campo tienden a repetirse; con él, cada auditoría alimenta la capacitación y el sistema se corrige solo.", "Large field crews": "Cuadrillas de campo grandes", "Onboarding new staff": "Integración de personal nuevo", "The team estimated savings from sector references and stated assumptions. Here they are shown as a cost index, with no company figures. Move the sliders to test other reduction rates.": "El equipo estimó los ahorros con referencias del sector y supuestos declarados. Aquí se muestran como un índice de costos, sin cifras de la empresa. Mueve los controles para probar otras tasas de reducción.", "Illustrative weight: 50 of 100 cost points": "Peso ilustrativo: 50 de 100 puntos de costo", "Illustrative weight: 35 of 100 cost points (cable, paint, connectors, parts)": "Peso ilustrativo: 35 de 100 puntos de costo (cable, pintura, conectores, piezas)", "Illustrative weight: 15 of 100 cost points": "Peso ilustrativo: 15 de 100 puntos de costo", "Estimated cost reduction*": "Reducción de costo estimada*", "*Illustrative model: costs are an index of 100 points, not company figures. Reduction rates are team assumptions from sector references, not measured results. Project values 15% · 10% · 30% → 15.5% lower cost.": "*Modelo ilustrativo: los costos son un índice de 100 puntos, no cifras de la empresa. Las tasas de reducción son supuestos del equipo con referencias del sector, no resultados medidos. Valores del proyecto 15% · 10% · 30% → 15.5% menos costo."},F:function(t){var m,C={"Cable selection (underground / aerial)": "Selección de cable (subterráneo / aéreo)", "Bimetallic connectors in luminaires": "Conectores bimetálicos en luminarias", "Wiring inside arm / pole": "Cableado en brazo / poste", "Tape application (rubber / vinyl)": "Aplicación de cinta (de hule / vinil)", "Ballast, starter & capacitor wiring": "Conexión de balastro, arrancador y capacitor", "Aerial rack & catenary tension": "Bastidor aéreo y tensión de catenaria", "Continuity & short-circuit tests": "Pruebas de continuidad y cortocircuito", "Photocontrol maintenance": "Mantenimiento de fotocontroles", "Insulation resistance test (megger)": "Prueba de resistencia de aislamiento (megger)", "Junction box maintenance": "Mantenimiento de registros", "Conduit verification": "Verificación de ductos", "Compression bimetallic taps": "Derivaciones bimetálicas a compresión", "Traffic signal sync & programming": "Sincronización y programación de semáforos", "Seasonal & decorative lighting": "Iluminación decorativa y de temporada", "Pole foundations & civil works": "Cimentación de postes y obra civil", "Vertical signage hardware": "Herrajes de señalización vertical", "Asset management app": "App de gestión de activos", "Photo evidence (before/during/after)": "Evidencia fotográfica (antes/durante/después)", "Nonconformity logging": "Registro de no conformidades"},L={"Not cleared":"No habilitado","In progress":"En progreso","Expert":"Experto"};
+ function terms(s){Object.keys(C).sort(function(a,b){return b.length-a.length}).forEach(function(k){s=s.split(k).join(C[k])});return s;}
+ if(m=t.match(/^(T-\d+), (.+): level (\d), (.+)\. Click to change\.$/))return m[1]+", "+(C[m[2]]||m[2])+": nivel "+m[3]+", "+(L[m[4]]||m[4])+". Clic para cambiar.";
+ if(m=t.match(/^Cycle (\d+): trained (\d+) technicians? in (.+); checklists re-rated them and the matrix updated\.$/))return "Ciclo "+m[1]+": se capacitó a "+m[2]+" técnicos en "+terms(m[3]).replace(/ and /g," y ")+"; los checklists los volvieron a calificar y la matriz se actualizó.";
+ if(m=t.match(/^Crew ([A-Z]) \((\d+) level-1 ratings?\)\.$/))return "Cuadrilla "+m[1]+" ("+m[2]+" calificaciones de nivel 1).";
+ if(m=t.match(/^Internal instructors for (.+):$/))return "Instructores internos para "+(C[m[1]]||m[1])+":";
+ if(/\(\d+\)/.test(t)){var r=terms(t);if(r!==t)return r.replace(/\) and /g,") y ");}
+ return null;},title:"Sistema de capacitación y auditoría en ciclo cerrado · José Rodrigo Ramos García"};
+(function(){var box=document.getElementById("idx"),b=document.getElementById("idx-b"),p=document.getElementById("idx-p");
+  if(!document.getElementById("top"))document.body.id=document.body.id||"top";
+  var items=[["#top","Top"]].concat([].slice.call(document.querySelectorAll(".nav a")).map(function(a){return [a.getAttribute("href"),a.textContent];}));
+  items.forEach(function(x){var a=document.createElement("a");a.href=x[0];a.textContent=x[1];p.appendChild(a);});
+  var links=[].slice.call(p.querySelectorAll("a"));
+  function set(o){box.classList.toggle("open",o);b.setAttribute("aria-expanded",o?"true":"false");}
+  b.addEventListener("click",function(e){e.stopPropagation();set(!box.classList.contains("open"));});
+  links.forEach(function(a){a.addEventListener("click",function(){set(false);});});
+  document.addEventListener("click",function(e){if(!box.contains(e.target))set(false);});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&box.classList.contains("open")){set(false);b.focus();}});
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute("href"));});
+  function spy(){var y=innerHeight*.35,cur=0;secs.forEach(function(s,i){if(s&&i>0&&s.getBoundingClientRect().top<=y)cur=i;});links.forEach(function(a,i){a.classList.toggle("cur",i===cur);});}
+  addEventListener("scroll",spy,{passive:true});spy();})();
+(function(){
+var I=window.__I18N,D=I.D,F=I.F,ATTRS=["aria-label","title","alt"];
+function tr(s){var t=s.trim();if(!t||!/[A-Za-z]/.test(t))return s;var r=Object.prototype.hasOwnProperty.call(D,t)?D[t]:(F?F(t):null);return r==null?s:s.replace(t,r);}
+window.__tr=tr;window.LANG="en";
+function skipT(el){return !el||el.closest("script,style,[data-es],.lng");}
+function doText(n){if(skipT(n.parentElement))return;
+  if(LANG==="es"){if(n.__es!==n.nodeValue){n.__en=n.nodeValue;var v=tr(n.__en);n.__es=v;if(v!==n.nodeValue)n.nodeValue=v;}}
+  else if(n.__en!=null&&n.nodeValue===n.__es){n.__es=null;n.nodeValue=n.__en;}}
+function doEl(el){if(el.closest("script,style"))return;
+  if(el.hasAttribute("data-es")&&el.__l!==LANG){if(el.__h==null)el.__h=el.innerHTML;el.__l=LANG;el.innerHTML=LANG==="es"?el.getAttribute("data-es"):el.__h;}
+  ATTRS.forEach(function(a){var v=el.getAttribute(a);if(v==null)return;el.__a=el.__a||{};var s=el.__a[a]||(el.__a[a]={});
+    if(LANG==="es"){if(v!==s.es){s.en=v;s.es=tr(v);if(s.es!==v)el.setAttribute(a,s.es);}}
+    else if(s.en!=null&&v===s.es){s.es=null;el.setAttribute(a,s.en);}});}
+function walk(r){if(r.nodeType===3){doText(r);return;}if(r.nodeType!==1)return;doEl(r);
+  var w=document.createTreeWalker(r,5),n;while(n=w.nextNode()){if(n.nodeType===3)doText(n);else doEl(n);}}
+new MutationObserver(function(ms){ms.forEach(function(m){if(m.type==="characterData")doText(m.target);else if(m.type==="attributes")doEl(m.target);else m.addedNodes.forEach(walk);});})
+  .observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:ATTRS});
+var P=CanvasRenderingContext2D.prototype,of=P.fillText;
+P.fillText=function(t){var a=[].slice.call(arguments);if(LANG==="es"&&typeof t==="string")a[0]=tr(t);return of.apply(this,a);};
+var tEn=document.title,btn=document.getElementById("lng");
+function setLang(l){window.LANG=l;document.documentElement.lang=l;walk(document.body);
+  btn.setAttribute("aria-label",l==="en"?"Cambiar a español":"Switch to English");
+  document.title=l==="en"?tEn:I.title;
+  try{localStorage.setItem("lang",l)}catch(e){}
+  document.dispatchEvent(new Event("langchange"));}
+btn.addEventListener("click",function(){setLang(window.LANG==="en"?"es":"en")});
+var saved=null;try{saved=localStorage.getItem("lang")}catch(e){}
+if(saved==="es"||(!saved&&(navigator.language||"").toLowerCase().indexOf("es")===0))setLang("es");
+})();
+</script>
+<script>
+(function(){
+  /* Rich picture toggle */
+  var loops=document.getElementById("loops");
+  document.querySelectorAll(".toggle button").forEach(function(b){b.addEventListener("click",function(){
+    document.querySelectorAll(".toggle button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});loops.dataset.show=b.dataset.show;});});
+
+  /* Loop steps */
+  var steps=[
+    ["Skills matrix","Every technician is rated in 19 field competencies on a three-level color scale. The supervisor sees each crew's real skill level and who is cleared for each critical activity."],
+    ["Gap detection","Red cells flag urgent needs by competency and crew. High priority: level 1 in critical skills. Medium: level 2 ready to reach 3. Level 3 technicians become candidate instructors."],
+    ["Training manual","Each priority maps to a module of the manual, taught with the five-step method: explain, demonstrate, practice together, evaluate and give feedback."],
+    ["Evaluation checklists","After training, the module checklist rates the technician again. The new level updates the matrix, priorities change and the cycle restarts."]
+  ];
+  var sb=document.querySelectorAll(".step");
+  function show(i){sb.forEach(function(b,j){b.setAttribute("aria-pressed",j===i?"true":"false")});document.getElementById("d-t").textContent=steps[i][0];document.getElementById("d-p").textContent=steps[i][1];}
+  sb.forEach(function(b){b.addEventListener("click",function(){show(+b.dataset.i)})});show(0);
+
+  /* Matrix */
+  var groups=[
+    ["Luminaire maintenance",["Cable selection (underground / aerial)","Bimetallic connectors in luminaires","Wiring inside arm / pole","Tape application (rubber / vinyl)","Ballast, starter & capacitor wiring"]],
+    ["Electrical network",["Aerial rack & catenary tension","Continuity & short-circuit tests","Photocontrol maintenance","Insulation resistance test (megger)","Junction box maintenance","Conduit verification","Compression bimetallic taps"]],
+    ["Mobility & civil works",["Traffic signal sync & programming","Seasonal & decorative lighting","Pole foundations & civil works","Vertical signage hardware"]],
+    ["Records & quality",["Asset management app","Photo evidence (before/during/after)","Nonconformity logging"]]
+  ];
+  var comps=[];groups.forEach(function(g){g[1].forEach(function(c){comps.push(c)})});
+  var techs=[["T-01","Crew A"],["T-02","Crew A"],["T-03","Crew A"],["T-04","Crew B"],["T-05","Crew B"],["T-06","Crew B"],["T-07","Crew C"],["T-08","Crew C"]];
+  var base=[
+    [3,2,3,3,3, 3,3,2,2,3,3,3, 3,3,2,3, 2,1,1],
+    [2,3,3,2,3, 2,2,3,1,2,3,2, 2,3,3,2, 3,2,1],
+    [3,3,3,3,3, 3,3,3,3,3,3,3, 3,3,3,3, 3,3,2],
+    [1,1,2,2,1, 2,1,2,1,2,2,1, 2,2,3,2, 2,1,1],
+    [3,2,2,3,2, 2,3,3,2,3,2,2, 1,2,2,3, 2,2,1],
+    [2,3,3,2,3, 3,2,2,2,2,3,3, 3,2,3,2, 1,1,1],
+    [3,3,2,3,3, 3,3,3,3,2,3,3, 2,3,3,3, 3,3,2],
+    [2,2,3,2,2, 1,2,2,1,2,2,2, 2,2,2,2, 2,1,1]
+  ];
+  var m=base.map(function(r){return r.slice()});
+  var names=["","Not cleared","In progress","Expert"];
+  var thead=document.querySelector("#mx thead"),tbody=document.querySelector("#mx tbody");
+  thead.innerHTML="<tr class='grp'><th></th>"+groups.map(function(g){return "<th colspan='"+g[1].length+"'>"+g[0]+"</th>"}).join("")+"<th></th></tr>"+
+    "<tr class='cmp'><th scope='col' style='text-align:left;padding-left:10px'>Technician</th>"+comps.map(function(c){return "<th scope='col'>"+c+"</th>"}).join("")+"<th scope='col' style='text-align:left;padding-left:10px'>Clearance</th></tr>";
+  function status(row){var r=row.filter(function(v){return v===1}).length,y=row.filter(function(v){return v===2}).length;
+    if(r>=2)return ["s1","Retrain before field work"]; if(r===1||y>0)return ["s2","Cleared under supervision"]; return ["s3","Cleared to work alone"];}
+  function render(){
+    tbody.innerHTML=techs.map(function(t,i){var s=status(m[i]);
+      return "<tr><th scope='row'>"+t[0]+"<small>"+t[1]+"</small></th>"+m[i].map(function(v,j){
+        return "<td><button class='cell l"+v+"' type='button' data-r='"+i+"' data-c='"+j+"' aria-label='"+t[0]+", "+comps[j]+": level "+v+", "+names[v]+". Click to change.'>"+v+"</button></td>"}).join("")+
+        "<td class='stat'><span class='sp "+s[0]+"'>"+s[1]+"</span></td></tr>"}).join("");
+    var all=[].concat.apply([],m),reds=all.filter(function(v){return v===1}).length;
+    var dom=all.reduce(function(a,b){return a+b},0)/(all.length*3)*100;
+    document.getElementById("i-red").textContent=reds;
+    document.getElementById("i-dom").textContent=dom.toFixed(1)+"%";
+    var st=document.getElementById("i-st"),L={r:document.getElementById("lr"),y:document.getElementById("ly"),g:document.getElementById("lg")};
+    Object.keys(L).forEach(function(k){L[k].classList.remove("on")});
+    if(dom<75||reds>=20){L.r.classList.add("on");st.textContent="Stop and train";}
+    else if(dom<88||reds>0){L.y.classList.add("on");st.textContent="Targeted training";}
+    else{L.g.classList.add("on");st.textContent="Stable · keep auditing";}
+    var need=comps.map(function(c,j){return {c:c,j:j,n:m.filter(function(r){return r[j]===1}).length}}).sort(function(a,b){return b.n-a.n||a.j-b.j});
+    var top8=need.filter(function(x){return x.n>0}).slice(0,8);
+    document.getElementById("bars").innerHTML=top8.length?top8.map(function(r){return "<div class='bar'><span class='nm' title='"+r.c+"'>"+r.c+"</span><span class='tr'><span class='fl' style='width:"+(r.n/techs.length*100)+"%'></span></span><span class='v'>"+r.n+"</span></div>"}).join(""):"<p class='muted small'>No level-1 ratings. Every competency is covered.</p>";
+    var items=[];
+    if(top8.length){var j=top8[0].j,ex=techs.filter(function(t,i){return m[i][j]===3}).map(function(t){return t[0]});
+      items.push("<li><i class='dot d1'></i><span><b>Train first:</b> "+top8.slice(0,2).map(function(r){return r.c+" ("+r.n+")"}).join(" and ")+".</span></li>");
+      items.push("<li><i class='dot d3'></i><span><b>Internal instructors for "+top8[0].c+":</b> "+(ex.length?ex.join(", "):"none yet, so the lead trainer covers it")+".</span></li>");}
+    var retrain=techs.filter(function(t,i){return status(m[i])[0]==="s1"}).map(function(t){return t[0]});
+    items.push("<li><i class='dot d2'></i><span><b>Pilot group candidates:</b> "+(retrain.length?retrain.join(", "):"none")+".</span></li>");
+    var crews={};techs.forEach(function(t,i){crews[t[1]]=(crews[t[1]]||0)+m[i].filter(function(v){return v===1}).length});
+    var wc=Object.keys(crews).sort(function(a,b){return crews[b]-crews[a]})[0];
+    if(crews[wc]>0)items.push("<li><i class='dot' style='background:var(--led)'></i><span><b>Crew to audit next:</b> "+wc+" ("+crews[wc]+" level-1 ratings).</span></li>");
+    document.getElementById("plan").innerHTML=items.join("");
+  }
+  tbody.addEventListener("click",function(e){var b=e.target.closest(".cell");if(!b)return;var r=+b.dataset.r,c=+b.dataset.c;m[r][c]=m[r][c]%3+1;render();var nb=tbody.querySelector(".cell[data-r='"+r+"'][data-c='"+c+"']");if(nb)nb.focus();});
+  var cyc=0;
+  document.getElementById("reset").addEventListener("click",function(){m=base.map(function(r){return r.slice()});cyc=0;document.getElementById("cyc").textContent="";render();});
+  document.getElementById("cycle").addEventListener("click",function(){
+    var need=comps.map(function(c,j){return {c:c,j:j,n:m.filter(function(r){return r[j]===1}).length,y:m.filter(function(r){return r[j]===2}).length}});
+    var tgt=need.filter(function(x){return x.n>0}).sort(function(a,b){return b.n-a.n||a.j-b.j}).slice(0,2);
+    var mode="red";
+    if(!tgt.length){tgt=need.filter(function(x){return x.y>0}).sort(function(a,b){return b.y-a.y||a.j-b.j}).slice(0,2);mode="yellow";}
+    if(!tgt.length){document.getElementById("cyc").textContent="Every technician is an expert in every competency. The loop keeps auditing to hold the level.";return;}
+    var changed=[],people={};
+    tgt.forEach(function(x){m.forEach(function(r,i){if((mode==="red"&&r[x.j]===1)||(mode==="yellow"&&r[x.j]===2)){r[x.j]++;changed.push([i,x.j]);people[i]=1;}})});
+    cyc++;render();
+    changed.forEach(function(p){var b=tbody.querySelector(".cell[data-r='"+p[0]+"'][data-c='"+p[1]+"']");if(b){b.classList.remove("flash");void b.offsetWidth;b.classList.add("flash");}});
+    if(changed.length){var fb=tbody.querySelector(".cell[data-r='"+changed[0][0]+"'][data-c='"+changed[0][1]+"']"),sc=document.querySelector("#matrix .scroll");if(fb&&sc){var cr=fb.getBoundingClientRect(),sr=sc.getBoundingClientRect();sc.scrollBy({left:cr.left-sr.left-sr.width/2,behavior:"smooth"});}}
+    document.getElementById("cyc").textContent="Cycle "+cyc+": trained "+Object.keys(people).length+" technicians in "+tgt.map(function(x){return x.c}).join(" and ")+"; checklists re-rated them and the matrix updated.";
+  });
+  render();
+
+  /* Modules */
+  var mods=[
+    ["LED luminaire installation",[["1.1","Cable selection and verification",1],["1.2","Bimetallic and H-type connectors",1.5],["1.3","Wiring inside arm / pole",1],["1.4","Ballast, starter and capacitor connection",1.5],["1.5","Photocells and shorting caps",1],["1.6","Voltage and operation checks",1.5],["1.7","Practical evaluation",1.5]]],
+    ["Preventive luminaire maintenance",[["2.1","Optical group and diffuser cleaning",1],["2.2","Lubrication of moving parts",0.5],["2.3","Connection check and terminal tightening",1],["2.4","Operation check and measurements",1.5],["2.5","Work-site cleanup",0.5],["2.6","Practical evaluation",1.5]]],
+    ["Electrical network maintenance",[["3.1","Aerial cabling (racks, brackets)",1.5],["3.2","Continuity and insulation tests",1.5],["3.3","Cabinets and photocontrols",1],["3.4","Junction boxes (cleaning, covers, connections)",1.5],["3.5","Tapes and connectors in junction boxes",1],["3.6","Practical evaluation",1.5]]],
+    ["Corrective maintenance (repairs)",[["4.1","Fault diagnosis method",1.5],["4.2","Root cause vs. symptoms",1],["4.3","Selecting and replacing parts",1.5],["4.4","Permanent repair techniques",1.5],["4.5","Verification and testing",1],["4.6","Practical evaluation",2]]]
+  ];
+  var mx=0;mods.forEach(function(md){md.h=md[1].reduce(function(a,u){return a+u[2]},0);mx=Math.max(mx,md.h)});
+  var host=document.getElementById("mods");
+  host.innerHTML=mods.map(function(md,i){return "<div class='mod' role='button' tabindex='0' aria-expanded='false'><span class='n'>M"+(i+1)+"</span><span class='nm'>"+md[0]+"</span><span class='hb' aria-hidden='true'><i style='width:"+(md.h/mx*100)+"%'></i></span><span class='h'>"+md.h+" h</span><div class='units'><table>"+md[1].map(function(u){return "<tr><td>"+u[0]+"</td><td>"+u[1]+"</td><td>"+u[2]+" h</td></tr>"}).join("")+"</table></div></div>"}).join("");
+  host.querySelectorAll(".mod").forEach(function(el){function t(){el.setAttribute("aria-expanded",el.getAttribute("aria-expanded")==="true"?"false":"true")}
+    el.addEventListener("click",t);el.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();t()}})});
+
+  /* Motion: count-up, reveal on scroll, gantt */
+  var motion=true;
+  if(motion){
+    document.querySelectorAll(".kpis b").forEach(function(b){var txt=b.textContent,mt=txt.match(/[0-9.]+/);if(!mt)return;var end=parseFloat(mt[0]),dec=(mt[0].split(".")[1]||"").length,t0=null;
+      function f(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/1400),e=1-Math.pow(1-p,3);b.textContent=txt.replace(mt[0],(end*e).toFixed(dec));if(p<1)requestAnimationFrame(f);else b.textContent=txt;}
+      requestAnimationFrame(f);});
+    if("IntersectionObserver" in window){
+      var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add(e.target.classList.contains("gantt")?"go":"rv");io.unobserve(e.target);}})},{threshold:.15});
+      document.querySelectorAll("main .panel, main .stop, main .alt, main .ms, main .lv, main .risks div, main .loopcard, main .step, .gantt, main .impact div").forEach(function(el){if(el.getBoundingClientRect().top>window.innerHeight)io.observe(el);});
+    }
+  }
+
+  /* Impact */
+  var fmt=function(v){return v.toFixed(1)+" pts"};
+  var B=[50,35,15],D=[15,10,30];
+  function calc(){var v=[1,2,3].map(function(k,i){var p=+document.getElementById("r"+k).value;document.getElementById("p"+k).textContent=p+"%";var s=B[i]*p/100;document.getElementById("o"+k).textContent=fmt(s);document.getElementById("e"+k).textContent=fmt(s);return s});
+    var t=v[0]+v[1]+v[2];document.getElementById("tot").textContent="−"+t.toFixed(1)+"%";
+    [1,2,3].forEach(function(k,i){document.getElementById("s"+k).style.width=(t?v[i]/t*100:0)+"%"});}
+  [1,2,3].forEach(function(k){document.getElementById("r"+k).addEventListener("input",calc)});
+  document.getElementById("calc-reset").addEventListener("click",function(){[1,2,3].forEach(function(k,i){document.getElementById("r"+k).value=D[i]});calc();});
+  calc();
+})();
+</script>
+</body>
+</html>
