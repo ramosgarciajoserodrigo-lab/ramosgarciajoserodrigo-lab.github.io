@@ -3,6 +3,8 @@
 Industrial & Systems Engineering student at Tecnológico de Monterrey.
 Interactive pages for industry projects developed with partner companies.
 
+**Portfolio:** [ramosgarciajoserodrigo-lab.github.io](https://ramosgarciajoserodrigo-lab.github.io/)
+
 ## Projects
 
 | Project | Partner | Focus |
